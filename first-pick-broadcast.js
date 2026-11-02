@@ -5,12 +5,12 @@ function close(){if(timer)clearTimeout(timer);timer=null;if(overlay){overlay.rem
 window.closeFirstPickBroadcast=close;
 window.playDraftAnimationPreview=function(){
  try{
-  const f=window.state?.frontOffice||{draftLog:[],prospects:[]};
+  const f=(typeof state!=='undefined'?state.frontOffice:null)||{draftLog:[],prospects:[]};
   const first=f.draftLog?.[0];
   const player=first?(f.prospects||[]).find(p=>p.name===first.player):null;
   const pick=player||{name:'David Bailey',pos:'EDGE',rating:94};
-  const club=first&&window.TEAMS?.[first.team]?.[1]||'First Overall Selection';
-  window.showFirstPickBroadcast(pick,club,window.state?.year||2026,f.prospects||[]);
+  const club=first&&(typeof TEAMS!=='undefined'?TEAMS[first.team]?.[1]:null)||'First Overall Selection';
+  window.showFirstPickBroadcast(pick,club,(typeof state!=='undefined'?state.year:null)||2026,f.prospects||[]);
  }catch(error){
   console.error('Draft animation preview error',error);
   alert('Animation could not start: '+error.message);
