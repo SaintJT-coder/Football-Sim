@@ -34,9 +34,29 @@ document.head.appendChild(css);
 const oldDraft=window.draftProspect,oldAdvance=window.advanceDraft,oldAuto=window.autoDraft;
 let overlay=null;
 function close(){if(overlay){overlay.remove();overlay=null}}
+function rookieAvatar(p,team){
+ const colors=['#2de0d0','#ff694f','#9b83ff','#f9b947','#60a5fa','#f472b6','#a3e635','#fb923c','#34d399','#f87171','#818cf8','#facc15'];
+ const jersey=colors[Math.abs(Number(team)||0)%colors.length];
+ const skin=['#8e573a','#c98c65','#edbd91','#6b402c'][Array.from(p.name||'').reduce((n,c)=>n+c.charCodeAt(0),0)%4];
+ const number=String((Array.from(p.name||'').reduce((n,c)=>n+c.charCodeAt(0),0)%89)+10);
+ return '<div class="dn-rookie-wrap"><div class="dn-rookie-shadow"></div><div class="dn-rookie-body" style="--jersey:'+jersey+';--skin:'+skin+'"><div class="dn-rookie-head"><div class="dn-rookie-hair"></div><div class="dn-rookie-eyes"></div><div class="dn-rookie-mouth"></div></div><div class="dn-rookie-neck"></div><div class="dn-rookie-arm left"><div class="dn-rookie-hand"></div></div><div class="dn-rookie-arm right"><div class="dn-rookie-hand"></div></div><div class="dn-rookie-torso"><div class="dn-rookie-shoulders"></div><span>'+number+'</span></div><div class="dn-rookie-leg left"><div class="dn-rookie-shoe"></div></div><div class="dn-rookie-leg right"><div class="dn-rookie-shoe"></div></div></div></div>';
+}
+const avatarCss=document.createElement('style');avatarCss.textContent=`
+.dn-rookie-wrap{height:255px;width:190px;position:relative;margin:12px auto 0;filter:drop-shadow(0 15px 18px #0008)}
+.dn-rookie-shadow{position:absolute;bottom:0;left:20px;width:150px;height:22px;background:#0009;border-radius:50%;animation:dn-shadow 0.5s ease-in-out infinite alternate}
+.dn-rookie-body{position:absolute;top:18px;left:39px;width:112px;height:200px;animation:dn-rookie-groove .5s ease-in-out infinite alternate;transform-origin:50% 85%}
+.dn-rookie-head{position:absolute;z-index:5;top:0;left:31px;width:51px;height:57px;background:var(--skin);border:4px solid #1b1a27;border-radius:9px 9px 13px 13px;box-shadow:inset -9px -4px #0002;animation:dn-head-bob .5s infinite alternate}
+.dn-rookie-hair{position:absolute;top:-5px;left:-4px;width:51px;height:16px;background:#171822;border:3px solid #090b13;border-radius:8px 8px 2px 2px}.dn-rookie-eyes{position:absolute;top:27px;left:9px;width:6px;height:6px;background:#101622;box-shadow:20px 0 #101622}.dn-rookie-mouth{position:absolute;bottom:8px;left:18px;width:14px;height:4px;background:#492f2d;border-radius:5px}
+.dn-rookie-neck{position:absolute;top:48px;left:44px;width:25px;height:24px;background:var(--skin);border:3px solid #171d2c}
+.dn-rookie-torso{position:absolute;z-index:4;top:64px;left:12px;width:89px;height:85px;background:var(--jersey);border:5px solid #172236;border-radius:14px 14px 9px 9px;box-shadow:inset -12px -5px #0003;display:grid;place-items:center}.dn-rookie-torso span{font-size:38px;font-weight:1000;color:white;text-shadow:3px 3px #132339,-2px -2px #132339}.dn-rookie-shoulders{position:absolute;top:8px;width:85%;height:5px;background:#fff9}
+.dn-rookie-arm{position:absolute;z-index:2;top:67px;width:27px;height:84px;background:linear-gradient(var(--jersey) 0 40%,var(--skin) 40%);border:4px solid #1a2030;border-radius:9px;transform-origin:50% 8%}.dn-rookie-arm.left{left:-12px;animation:dn-arm-left .5s infinite alternate}.dn-rookie-arm.right{right:-12px;animation:dn-arm-right .5s infinite alternate}.dn-rookie-hand{position:absolute;bottom:-12px;left:-3px;width:23px;height:21px;background:var(--skin);border:3px solid #172030;border-radius:5px}
+.dn-rookie-leg{position:absolute;z-index:1;top:140px;width:34px;height:75px;background:#e7e9ee;border:5px solid #182133;border-radius:5px;transform-origin:50% 0}.dn-rookie-leg.left{left:17px;animation:dn-leg-left .5s infinite alternate}.dn-rookie-leg.right{right:17px;animation:dn-leg-right .5s infinite alternate}.dn-rookie-shoe{position:absolute;bottom:-8px;left:-7px;width:40px;height:19px;background:#111d2e;border:3px solid #c9f9fa;border-radius:6px}
+@keyframes dn-rookie-groove{0%{transform:translateY(0) rotate(-9deg)}100%{transform:translateY(-19px) rotate(9deg)}}@keyframes dn-head-bob{to{transform:rotate(12deg)}}@keyframes dn-arm-left{from{transform:rotate(55deg)}to{transform:rotate(-85deg)}}@keyframes dn-arm-right{from{transform:rotate(-55deg)}to{transform:rotate(85deg)}}@keyframes dn-leg-left{from{transform:rotate(22deg)}to{transform:rotate(-24deg)}}@keyframes dn-leg-right{from{transform:rotate(-22deg)}to{transform:rotate(24deg)}}@keyframes dn-shadow{to{transform:scale(.75);opacity:.45}}
+@media(prefers-reduced-motion:reduce){.dn-rookie-wrap *{animation:none!important}}
+`;document.head.appendChild(avatarCss);
 function celebrate(p,team,pick){
  close();
- const dances=['shuffle','spin','bounce','wave'],dance=dances[Math.floor(Math.random()*dances.length)];
+ const dance='victory shuffle';
  overlay=document.createElement('div');overlay.className='dn-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','Draft pick announcement');
  let confetti=Array.from({length:42},(_,i)=>'<i class="dn-confetti" style="--left:'+(i*37%100)+'%;--color:'+['#d7ff35','#17c8d5','#fff','#e9ac47'][i%4]+';--rotate:'+(i*43)+'deg;--delay:'+(i%8*.13)+'s;--duration:'+(2+i%5*.4)+'s"></i>').join('');
  overlay.innerHTML=confetti+'<div class="dn-overlay-content"><div class="dn-flash">THE PICK IS IN · ROUND '+pick.round+' · PICK '+pick.slot+'</div><div class="dn-announcement">'+TEAMS[team][1].toUpperCase()+' SELECT</div><div class="dn-player">'+p.name+'</div><div style="color:#b2e8e8">'+p.pos+' · '+p.rating+' OVR · '+p.dev+' DEVELOPMENT</div><span class="dn-dancer '+dance+'" aria-hidden="true">🕺</span><div style="font-size:12px;color:#a7bbcf">ROOKIE CELEBRATION · '+dance.toUpperCase()+'</div><button onclick="window.closeDraftCelebration()">CONTINUE DRAFT →</button></div>';
