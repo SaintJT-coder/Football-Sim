@@ -27,12 +27,14 @@ jobs:
           test -s dashboard.js
           test -s playoffs.js
           test -s freeagency.js
+          test -s draftnight.js
           node --check expansion.js
           node --check engine.js
           node --check frontoffice.js
           node --check dashboard.js
           node --check playoffs.js
           node --check freeagency.js
+          node --check draftnight.js
           python3 - <<'PY'
           from pathlib import Path
           import re
