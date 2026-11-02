@@ -3,6 +3,14 @@ const template="<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF
 let timer=null,overlay=null;
 function close(){if(timer)clearTimeout(timer);timer=null;if(overlay){overlay.remove();overlay=null}}
 window.closeFirstPickBroadcast=close;
+window.playDraftAnimationPreview=function(){
+ const f=state.frontOffice||{};
+ const first=f.draftLog?.[0];
+ const player=first?(f.prospects||[]).find(p=>p.name===first.player):null;
+ const pick=player||{name:'David Bailey',pos:'EDGE',rating:94};
+ const club=first?TEAMS[first.team]?.[1]:'First Overall Selection';
+ window.showFirstPickBroadcast(pick,club,state.year,f.prospects||[]);
+};
 window.showFirstPickBroadcast=function(pick,team,year,prospects){
  close();
  const clean=v=>String(v??'').replace(/[<>]/g,'');
