@@ -56,8 +56,34 @@ window.autoDraft=function(){close();oldAuto()};
 function draftStage(){
  const f=state.frontOffice,picks=f.picks.filter(p=>!p.used).sort((a,b)=>a.round-b.round||a.slot-b.slot),now=picks[0],nextMine=picks.find(p=>p.owner===state.team),recent=f.draftLog.slice(-5).reverse();
  const strip=picks.slice(0,9).map((p,i)=>'<div class="dn-pick '+(!i?'current':'')+'">RD '+p.round+' · PK '+p.slot+'<br><b>'+TEAMS[p.owner][0]+'</b></div>').join('');
- return '<div class="dn-page"><div class="dn-top"><strong>🏈 '+state.year+' ROOKIE DRAFT</strong><div class="dn-clock">ON THE CLOCK · '+(now?'RD '+now.round+' PK '+now.slot:'COMPLETE')+'</div><strong>YOUR NEXT PICK: '+(nextMine?'RD '+nextMine.round+' · PK '+nextMine.slot:'NONE')+'</strong></div><div class="dn-picks">'+strip+'</div><div class="dn-stage"><div class="dn-lights"></div><div class="dn-arch"><p>GRIDIRON GM · DRAFT NIGHT</p><h2>'+(now?TEAMS[now.owner][1].toUpperCase():'DRAFT COMPLETE')+'</h2><p>'+(now?'ON THE CLOCK':'ALL SELECTIONS FINAL')+'</p></div></div><div class="dn-actions"><button class="primary" onclick="window.advanceDraft()">SKIP TO MY NEXT PICK</button><button onclick="window.autoDraft()">SIMULATE REMAINING DRAFT</button><button onclick="window.draftShowBoard()">VIEW DRAFT BOARD</button></div><div class="dn-panel"><h3>PREVIOUS SELECTIONS</h3><div class="dn-recent">'+(recent.map(x=>'<div><b>RD '+x.round+' · '+TEAMS[x.team][0]+'</b><p>'+x.player+' · '+x.pos+' · '+x.overall+' OVR</p></div>').join('')||'<p>Waiting for the first selection</p>')+'</div></div></div>';
+ return '<div class="dn-page"><div class="dn-top"><strong>🏈 '+state.year+' ROOKIE DRAFT</strong><div class="dn-clock">ON THE CLOCK · '+(now?'RD '+now.round+' PK '+now.slot:'COMPLETE')+'</div><strong>YOUR NEXT PICK: '+(nextMine?'RD '+nextMine.round+' · PK '+nextMine.slot:'NONE')+'</strong></div><div class="dn-picks">'+strip+'</div><div class="dn-stage"><div class="dn-lights"></div><div class="dn-arch"><p>GRIDIRON GM · DRAFT NIGHT</p><h2>'+(now?TEAMS[now.owner][1].toUpperCase():'DRAFT COMPLETE')+'</h2><p>'+(now?'ON THE CLOCK':'ALL SELECTIONS FINAL')+'</p></div></div><div class="dn-actions"><button class="primary" onclick="window.advanceDraft()">SKIP TO MY NEXT PICK</button><button onclick="window.autoDraft()">SIMULATE REMAINING DRAFT</button><button onclick="window.draftShowBoard()">VIEW DRAFT BOARD</button><button onclick="window.showDraftIntro()">REPLAY OPENING</button></div><div class="dn-panel"><h3>PREVIOUS SELECTIONS</h3><div class="dn-recent">'+(recent.map(x=>'<div><b>RD '+x.round+' · '+TEAMS[x.team][0]+'</b><p>'+x.player+' · '+x.pos+' · '+x.overall+' OVR</p></div>').join('')||'<p>Waiting for the first selection</p>')+'</div></div></div>';
 }
+
+const introStyle=document.createElement('style');introStyle.textContent=`
+.dn-intro{position:fixed;inset:0;z-index:99998;background:radial-gradient(ellipse at center,#123947,#030811 74%);display:grid;place-items:center;color:white;overflow:hidden}
+.dn-intro-stage{width:min(760px,95vw);min-height:370px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden;border-bottom:9px solid #1bb3c3}
+.dn-intro-spot{position:absolute;top:-150px;width:150px;height:660px;background:linear-gradient(#92faff88,transparent);filter:blur(25px);transform-origin:top;animation:dn-sweep 3s ease-in-out infinite alternate}
+.dn-intro-spot.left{left:15%;transform:rotate(27deg)}.dn-intro-spot.right{right:15%;animation-direction:alternate-reverse;transform:rotate(-27deg)}
+.dn-intro-arch{position:relative;border:8px solid #35a8b4;border-bottom:0;border-radius:55% 55% 0 0;padding:50px 22px 15px;width:80%;max-width:490px;background:linear-gradient(145deg,#07505a,#071629);box-shadow:0 0 70px #17c5d344;animation:dn-intro-rise 1.3s both}
+.dn-intro-title{font-size:clamp(30px,7vw,70px);font-weight:1000;font-style:italic;line-height:1;letter-spacing:-2px;text-shadow:0 0 24px #49e1e4}
+.dn-intro-caption{font-size:12px;letter-spacing:5px;color:#d7ff35;margin:14px}
+.dn-intro-crowd{position:absolute;bottom:-5px;left:0;width:100%;height:70px;background:repeating-radial-gradient(ellipse at 50% 100%,#020814 0 11px,transparent 12px 26px);opacity:.8}
+.dn-intro-actions{position:relative;z-index:2;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.dn-intro-actions button{padding:13px 20px;font-weight:950;background:#d7ff35;color:#081622;border:0}
+.dn-intro-actions button.secondary{background:#253a4c;color:white}
+@keyframes dn-sweep{0%{transform:rotate(-30deg)}100%{transform:rotate(30deg)}}
+@keyframes dn-intro-rise{from{opacity:0;transform:translateY(100px) scale(.8)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(prefers-reduced-motion:reduce){.dn-intro-spot,.dn-intro-arch{animation:none!important}}
+`;document.head.appendChild(introStyle);
+let introShown=false;
+window.closeDraftIntro=function(){document.getElementById('dn-intro')?.remove()};
+window.showDraftIntro=function(){
+ if(document.getElementById('dn-intro'))return;
+ const el=document.createElement('div');el.id='dn-intro';el.className='dn-intro';el.setAttribute('role','dialog');el.setAttribute('aria-label','Draft night opening ceremony');
+ el.innerHTML='<div class="dn-intro-stage"><div class="dn-intro-spot left"></div><div class="dn-intro-spot right"></div><div class="dn-intro-arch"><div class="dn-intro-caption">THE FUTURE STARTS TONIGHT</div><div class="dn-intro-title">GRIDIRON<br>DRAFT NIGHT</div><div class="dn-intro-caption">'+state.year+' · ROUND ONE</div></div><div class="dn-intro-crowd"></div><div class="dn-intro-actions"><button onclick="closeDraftIntro()">ENTER DRAFT ROOM →</button><button class="secondary" onclick="closeDraftIntro();draftShowBoard()">VIEW BOARD</button></div></div>';
+ document.body.appendChild(el);
+};
+
 let showBoard=true;
 window.draftShowBoard=()=>{showBoard=!showBoard;render()};
 const priorRender=render;
@@ -66,6 +92,7 @@ render=function(){
  if(page==='Fantasy Draft'||page==='Draft Board'){
  const app=document.getElementById('app');if(!app)return;
  const current=app.innerHTML;
+ if(!introShown){introShown=true;window.showDraftIntro()}
  app.innerHTML=draftStage()+(showBoard?'<div class="dn-panel"><h3>YOUR DRAFT BOARD</h3>'+current+'</div>':'');
  }
 };
