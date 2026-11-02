@@ -29,3 +29,6 @@ nav=function(){oldNav();$('nav').innerHTML+=extraPages.map((p,i)=>'<button class
 function goExtra(i){page=extraPages[i];render();window.scrollTo(0,0);if(innerWidth<851)$('sidebar').style.display='none'}
 render=function(){extraStore();if(extraPages.includes(page)){nav();$('mobileSeason').textContent=state.year+' W'+state.week;$('app').innerHTML=[achievementsPage,staffPage,resignPage,playoffPage,leadersPage,depthPage,injuryPage,trainingPage,newsPage,socialPage,playbookPage][extraPages.indexOf(page)]();return}oldRender()};
 simulate=function(){oldSimulate();let e=extraStore();e.trainingPoints=Math.min(30,e.trainingPoints+(e.plan==='Development'?5:e.plan==='Recovery'?2:3));e.jobSecurity=Math.max(0,Math.min(100,e.jobSecurity+(record(state.team).w>record(state.team).l?1:-1)));save()};
+
+// Refresh navigation after expansion loads so new sections appear immediately.
+render();
