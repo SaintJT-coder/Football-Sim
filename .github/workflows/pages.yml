@@ -25,10 +25,12 @@ jobs:
           test -s engine.js
           test -s frontoffice.js
           test -s dashboard.js
+          test -s playoffs.js
           node --check expansion.js
           node --check engine.js
           node --check frontoffice.js
           node --check dashboard.js
+          node --check playoffs.js
           python3 - <<'PY'
           from pathlib import Path
           import re
