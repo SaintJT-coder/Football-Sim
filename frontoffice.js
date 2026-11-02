@@ -28,7 +28,7 @@ function selectProspect(p,pick){const f=init();if(!p||p.drafted||!pick||pick.use
  const newId=Math.max(...state.players.map(x=>x.id))+1;
  const salary=+(Math.max(.7,5.2-pick.round*.57-pick.slot*.035)).toFixed(2);
  state.players.push({id:newId,name:p.name,pos:p.pos,age:p.age,rating:p.rating,pot:p.pot,salary,team:pick.owner,stats:{yards:0,td:0,tackles:0,sacks:0},injury:0,years:4,target:false,fatigue:0,morale:70,development:0,rookie:true,devTrait:p.dev});
- f.draftLog.push({pick:pick.id,team:pick.owner,player:p.name,pos:p.pos,overall:p.rating,round:pick.round});
+ f.draftLog.push({pick:pick.id,team:pick.owner,player:p.name,prospectId:p.id,pos:p.pos,overall:p.rating,round:pick.round});
  state.news.unshift('Draft: '+TEAMS[pick.owner][1]+' selected '+p.name+' ('+p.pos+')');
  save();return true}
 function draftProspect(id){const f=init(),pick=currentPick();if(!pick)return notice('Draft complete');if(pick.owner!==state.team)return notice('AI team is on the clock. Advance to your pick.');let p=f.prospects.find(x=>x.id===id);if(!p||p.drafted)return;const projectedSalary=Math.max(.7,5.2-pick.round*.57-pick.slot*.035);selectProspect(p,pick);render()}
