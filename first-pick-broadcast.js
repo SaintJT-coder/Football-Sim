@@ -7,7 +7,7 @@ window.playDraftAnimationPreview=function(){
  try{
   const f=(typeof state!=='undefined'?state.frontOffice:null)||{draftLog:[],prospects:[]};
   const first=f.draftLog?.[0];
-  const player=first?(f.prospects||[]).find(p=>p.name===first.player):null;
+  const player=first?(f.prospects||[]).find(p=>first.prospectId?p.id===first.prospectId:p.name===first.player):null;
   const pick=player||{name:'David Bailey',pos:'EDGE',rating:94};
   const club=first&&(typeof TEAMS!=='undefined'?TEAMS[first.team]?.[1]:null)||'First Overall Selection';
   window.showFirstPickBroadcast(pick,club,(typeof state!=='undefined'?state.year:null)||2026,f.prospects||[]);
