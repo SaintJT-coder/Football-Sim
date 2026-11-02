@@ -67,7 +67,7 @@ function firstPickCutscene(f,before){
  if(before!==0||!f.draftLog.length)return false;
  const first=f.draftLog[0];
  if(first.round!==1)return false;
- const prospect=f.prospects.find(x=>x.name===first.player);
+ const prospect=f.prospects.find(x=>first.prospectId?x.id===first.prospectId:x.name===first.player);
  if(typeof window.showFirstPickBroadcast!=='function')return false;
  close();
  window.showFirstPickBroadcast(prospect||first,TEAMS[first.team]?.[1]||TEAMS[first.team]?.[0]||'DRAFT TEAM',state.year,f.prospects);
