@@ -59,7 +59,7 @@ function celebrate(p,team,pick){
  const dance='victory shuffle';
  overlay=document.createElement('div');overlay.className='dn-overlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-label','Draft pick announcement');
  let confetti=Array.from({length:42},(_,i)=>'<i class="dn-confetti" style="--left:'+(i*37%100)+'%;--color:'+['#d7ff35','#17c8d5','#fff','#e9ac47'][i%4]+';--rotate:'+(i*43)+'deg;--delay:'+(i%8*.13)+'s;--duration:'+(2+i%5*.4)+'s"></i>').join('');
- overlay.innerHTML=confetti+'<div class="dn-overlay-content"><div class="dn-flash">THE PICK IS IN · ROUND '+pick.round+' · PICK '+pick.slot+'</div><div class="dn-announcement">'+TEAMS[team][1].toUpperCase()+' SELECT</div><div class="dn-player">'+p.name+'</div><div style="color:#b2e8e8">'+p.pos+' · '+p.rating+' OVR · '+p.dev+' DEVELOPMENT</div><span class="dn-dancer '+dance+'" aria-hidden="true">🕺</span><div style="font-size:12px;color:#a7bbcf">ROOKIE CELEBRATION · '+dance.toUpperCase()+'</div><button onclick="window.closeDraftCelebration()">CONTINUE DRAFT →</button></div>';
+ overlay.innerHTML=confetti+'<div class="dn-overlay-content"><div class="dn-flash">THE PICK IS IN · ROUND '+pick.round+' · PICK '+pick.slot+'</div><div class="dn-announcement">'+TEAMS[team][1].toUpperCase()+' SELECT</div><div class="dn-player">'+p.name+'</div><div style="color:#b2e8e8">'+p.pos+' · '+p.rating+' OVR · '+p.dev+' DEVELOPMENT</div>'+rookieAvatar(p,team)+'<div style="font-size:12px;color:#a7bbcf">ROOKIE CELEBRATION · '+dance.toUpperCase()+'</div><button onclick="window.closeDraftCelebration()">CONTINUE DRAFT →</button></div>';
  document.body.appendChild(overlay);
 }
 window.closeDraftCelebration=close;
