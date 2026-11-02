@@ -22,7 +22,9 @@ jobs:
         run: |
           test -s index.html
           test -s expansion.js
+          test -s engine.js
           node --check expansion.js
+          node --check engine.js
           python3 - <<'PY'
           from pathlib import Path
           import re
