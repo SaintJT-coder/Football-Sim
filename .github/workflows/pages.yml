@@ -23,8 +23,10 @@ jobs:
           test -s index.html
           test -s expansion.js
           test -s engine.js
+          test -s frontoffice.js
           node --check expansion.js
           node --check engine.js
+          node --check frontoffice.js
           python3 - <<'PY'
           from pathlib import Path
           import re
