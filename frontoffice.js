@@ -23,7 +23,7 @@ function scout(id){let f=init(),p=f.prospects.find(x=>x.id===id);if(!p)return;le
 function grade(p){let s=init().scouted[p.id]||0;return s===0?'?':s===1?Math.round(p.rating/5)*5+' ± 8':s===2?p.rating+' ± 4':p.rating+' OVR'}
 function prospectRows(list,action=true){return list.map(p=>'<div class="card" style="margin:8px 0"><div class="row" style="gap:12px;flex-wrap:wrap"><div><b>'+xp(p.name)+'</b> <span class="pill">'+p.pos+'</span><p class="muted small">Age '+p.age+' · Grade '+grade(p)+' · Projected '+p.projection+' · Athletic '+p.athletic+' · Scout '+(init().scouted[p.id]||0)+'/3</p></div><div><button onclick="scoutProspect(\''+p.id+'\')">Scout</button> '+(action?'<button class="primary" onclick="draftProspect(\''+p.id+'\')">Draft</button>':'')+'</div></div></div>').join('')}
 function aiDraft(pick){const f=init(),pool=f.prospects.filter(p=>!p.drafted);if(!pool.length)return;pool.sort((a,b)=>(b.rating+b.pot*.2+need(pick.owner,b.pos)*.45)-(a.rating+a.pot*.2+need(pick.owner,a.pos)*.45));selectProspect(pool[0],pick)}
-function selectProspect(p,pick){if(!p||p.drafted||!pick||pick.used)return false;
+function selectProspect(p,pick){const f=init();if(!p||p.drafted||!pick||pick.used)return false;
  p.drafted=true;pick.used=true;
  const newId=Math.max(...state.players.map(x=>x.id))+1;
  const salary=+(Math.max(.7,5.2-pick.round*.57-pick.slot*.035)).toFixed(2);
