@@ -25,6 +25,15 @@ jobs:
           node --check expansion.js
           python3 - <<'PY'
           from pathlib import Path
+          import re
+          html=Path('index.html').read_text()
+          match=re.search(r'<script>(.*?)</script>',html,re.S)
+          assert match, 'Inline app script missing'
+          Path('/tmp/gridiron-inline.js').write_text(match.group(1))
+          PY
+          node --check /tmp/gridiron-inline.js
+          python3 - <<'PY'
+          from pathlib import Path
           html=Path('index.html').read_text()
           assert 'expansion.js' in html
           assert '</html>' in html
