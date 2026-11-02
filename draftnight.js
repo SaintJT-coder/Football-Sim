@@ -63,16 +63,33 @@ function celebrate(p,team,pick){
  document.body.appendChild(overlay);
 }
 window.closeDraftCelebration=close;
+function firstPickCutscene(f,before){
+ if(before!==0||!f.draftLog.length)return false;
+ const first=f.draftLog[0];
+ if(first.round!==1)return false;
+ const prospect=f.prospects.find(x=>x.name===first.player);
+ if(typeof window.showFirstPickBroadcast!=='function')return false;
+ close();
+ window.showFirstPickBroadcast(prospect||first,TEAMS[first.team]?.[1]||TEAMS[first.team]?.[0]||'DRAFT TEAM',state.year,f.prospects);
+ return true;
+}
 window.draftProspect=function(id){
  const f=state.frontOffice,pick=f.picks.filter(x=>!x.used).sort((a,b)=>a.round-b.round||a.slot-b.slot)[0],p=f.prospects.find(x=>x.id===id);
  const before=f.draftLog.length;oldDraft(id);
- if(pick&&p&&f.draftLog.length>before)celebrate(p,pick.owner,pick);
+ if(f.draftLog.length<=before)return;
+ if(firstPickCutscene(f,before))return;
+ if(pick&&p)celebrate(p,pick.owner,pick);
 };
 window.advanceDraft=function(){
  const f=state.frontOffice,before=f.draftLog.length;oldAdvance();
- if(f.draftLog.length>before){const last=f.draftLog[f.draftLog.length-1],p=f.prospects.find(x=>x.name===last.player);if(p)celebrate(p,last.team,{round:last.round,slot:Number(last.pick.split('-').pop())})}
+ if(f.draftLog.length<=before)return;
+ if(firstPickCutscene(f,before))return;
+ const last=f.draftLog[f.draftLog.length-1],p=f.prospects.find(x=>x.name===last.player);
+ if(p)celebrate(p,last.team,{round:last.round,slot:Number(last.pick.split('-').pop())});
 };
-window.autoDraft=function(){close();oldAuto()};
+window.autoDraft=function(){
+ const f=state.frontOffice,before=f.draftLog.length;close();oldAuto();firstPickCutscene(f,before);
+};
 function draftStage(){
  const f=state.frontOffice,picks=f.picks.filter(p=>!p.used).sort((a,b)=>a.round-b.round||a.slot-b.slot),now=picks[0],nextMine=picks.find(p=>p.owner===state.team),recent=f.draftLog.slice(-5).reverse();
  const strip=picks.slice(0,9).map((p,i)=>'<div class="dn-pick '+(!i?'current':'')+'">RD '+p.round+' · PK '+p.slot+'<br><b>'+TEAMS[p.owner][0]+'</b></div>').join('');
