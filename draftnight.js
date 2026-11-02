@@ -79,10 +79,38 @@ let introShown=false;
 window.closeDraftIntro=function(){document.getElementById('dn-intro')?.remove()};
 window.showDraftIntro=function(){
  if(document.getElementById('dn-intro'))return;
- const el=document.createElement('div');el.id='dn-intro';el.className='dn-intro';el.setAttribute('role','dialog');el.setAttribute('aria-label','Draft night opening ceremony');
- el.innerHTML='<div class="dn-intro-stage"><div class="dn-intro-spot left"></div><div class="dn-intro-spot right"></div><div class="dn-intro-arch"><div class="dn-intro-caption">THE FUTURE STARTS TONIGHT</div><div class="dn-intro-title">GRIDIRON<br>DRAFT NIGHT</div><div class="dn-intro-caption">'+state.year+' · ROUND ONE</div></div><div class="dn-intro-crowd"></div><div class="dn-intro-actions"><button onclick="closeDraftIntro()">ENTER DRAFT ROOM →</button><button class="secondary" onclick="closeDraftIntro();draftShowBoard()">VIEW BOARD</button></div></div>';
+ const el=document.createElement('div');el.id='dn-intro';el.className='dn-intro dn-cinematic';el.setAttribute('role','dialog');el.setAttribute('aria-label','Animated draft night opening ceremony');
+ const year=state.year;
+ el.innerHTML='<div class="dn-cinema-sky"><div class="dn-cinema-beam beam-one"></div><div class="dn-cinema-beam beam-two"></div><div class="dn-cinema-beam beam-three"></div><div class="dn-cinema-stars"></div></div><div class="dn-cinema-venue"><div class="dn-cinema-ticker">LIVE FROM THE GRIDIRON DRAFT • '+year+' • THE FUTURE IS ON THE CLOCK</div><div class="dn-cinema-screen"><div class="dn-cinema-kicker">WELCOME TO THE '+year+' DRAFT</div><div class="dn-cinema-logo">GRIDIRON <em>GM</em></div><div class="dn-cinema-title">DRAFT NIGHT</div><div class="dn-cinema-sub">12 FRANCHISES · 7 ROUNDS · ONE FUTURE</div><div class="dn-cinema-count" id="dn-cinema-count">03</div></div><div class="dn-cinema-stage"><div class="dn-cinema-podium">★ <span>GRIDIRON</span> ★</div></div><div class="dn-cinema-audience"></div><div class="dn-cinema-flash"></div></div><div class="dn-cinema-controls"><button class="dn-cinema-enter" onclick="closeDraftIntro()">ENTER DRAFT ROOM →</button><button class="dn-cinema-skip" onclick="closeDraftIntro();draftShowBoard()">VIEW DRAFT BOARD</button><button class="dn-cinema-replay" onclick="replayDraftIntro()">↻ REPLAY INTRO</button></div>';
  document.body.appendChild(el);
+ window.dnIntroTimer&&clearInterval(window.dnIntroTimer);
+ let tick=3;window.dnIntroTimer=setInterval(()=>{if(!document.getElementById('dn-intro')){clearInterval(window.dnIntroTimer);return}tick--;let count=document.getElementById('dn-cinema-count');if(count)count.textContent=tick>0?'0'+tick:'ON THE CLOCK';if(tick<=0){clearInterval(window.dnIntroTimer);el.classList.add('dn-cinema-ready')}},1000);
 };
+window.replayDraftIntro=function(){window.dnIntroTimer&&clearInterval(window.dnIntroTimer);document.getElementById('dn-intro')?.remove();window.showDraftIntro()};
+const dnOldClose=window.closeDraftIntro;
+window.closeDraftIntro=function(){window.dnIntroTimer&&clearInterval(window.dnIntroTimer);dnOldClose()};
+const cinemaCss=document.createElement('style');cinemaCss.textContent=`
+.dn-cinematic{position:fixed;inset:0;z-index:100001;overflow:hidden;background:#02050c;color:#fff;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif}
+.dn-cinema-sky{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 60%,#103f5a 0%,#071225 46%,#02050c 100%)}
+.dn-cinema-stars{position:absolute;inset:0;background-image:radial-gradient(#e7faff88 1px,transparent 2px);background-size:27px 31px;opacity:.2}
+.dn-cinema-beam{position:absolute;bottom:5%;left:50%;width:22vw;height:120vh;transform-origin:bottom center;background:linear-gradient(0deg,#61f7ff66,transparent 85%);clip-path:polygon(48% 100%,52% 100%,100% 0,0 0);filter:blur(9px);animation:dn-sweep 5s ease-in-out infinite alternate}
+.dn-cinema-beam.beam-one{left:12%;animation-delay:-1s}.dn-cinema-beam.beam-two{left:72%;animation-delay:-3s;animation-direction:alternate-reverse}.dn-cinema-beam.beam-three{left:48%;background:linear-gradient(0deg,#d7ff3766,transparent 85%);animation-delay:-2s}
+.dn-cinema-venue{position:relative;width:min(1100px,100vw);height:min(82vh,720px);display:flex;align-items:center;flex-direction:column;justify-content:center;perspective:900px}
+.dn-cinema-ticker{position:absolute;top:0;background:#b8ee31;color:#08131b;font-weight:950;letter-spacing:2px;text-align:center;width:100%;padding:11px 6px;font-size:clamp(9px,1.6vw,13px);animation:dn-drop .6s both}
+.dn-cinema-screen{position:relative;z-index:2;width:min(90%,790px);min-height:48%;padding:clamp(20px,4vw,45px) 12px;text-align:center;border:4px solid #47dce7;box-shadow:0 0 45px #21cbd566,inset 0 0 50px #064e69;background:radial-gradient(ellipse,#154c68,#07172b 70%);transform:rotateX(8deg);animation:dn-screen-in 1.2s cubic-bezier(.2,.8,.2,1) both}
+.dn-cinema-kicker{font-weight:900;letter-spacing:5px;font-size:clamp(9px,1.5vw,15px);color:#b3f6f5;animation:dn-drop 1s .4s both}
+.dn-cinema-logo{font-weight:1000;letter-spacing:-3px;font-size:clamp(32px,7vw,82px);line-height:1.1;margin-top:12px;animation:dn-drop .9s .8s both}.dn-cinema-logo em{font-style:normal;color:#d7ff35}
+.dn-cinema-title{font-weight:1000;letter-spacing:8px;color:#d7ff35;font-size:clamp(17px,3vw,35px);animation:dn-drop .8s 1.1s both}
+.dn-cinema-sub{font-size:clamp(10px,1.5vw,15px);letter-spacing:2px;margin-top:12px;color:#cce7ec;animation:dn-drop .8s 1.4s both}
+.dn-cinema-count{font-size:clamp(26px,5vw,55px);font-weight:1000;color:#fff;text-shadow:0 0 20px #d7ff35;margin-top:15px;animation:dn-pulse 1s infinite alternate}
+.dn-cinema-stage{position:relative;width:88%;height:65px;background:linear-gradient(#163b51,#050a13);border-top:8px solid #52e0e4;transform:rotateX(35deg);box-shadow:0 10px 40px #000}.dn-cinema-podium{position:absolute;top:-32px;left:50%;transform:translateX(-50%);padding:15px 25px;background:linear-gradient(120deg,#152c40,#07121f);border:2px solid #6ce1e6;white-space:nowrap;font-weight:900;color:#d7ff35}.dn-cinema-podium span{color:#fff}
+.dn-cinema-audience{position:absolute;bottom:0;width:100%;height:15%;background:repeating-linear-gradient(80deg,#01040a 0 14px,#132b38 15px 22px,#01040a 23px 34px);clip-path:polygon(0 30%,10% 0,25% 40%,40% 5%,60% 30%,80% 0,100% 30%,100% 100%,0 100%);animation:dn-crowd 1s infinite alternate}
+.dn-cinema-controls{position:absolute;bottom:max(12px,env(safe-area-inset-bottom));z-index:5;display:flex;justify-content:center;gap:9px;flex-wrap:wrap;padding:0 12px}.dn-cinema-controls button{font-weight:950;padding:12px 17px;border-radius:8px;cursor:pointer}.dn-cinema-enter{background:#d7ff35;color:#071323;border:0;box-shadow:0 0 25px #d7ff3566}.dn-cinema-skip,.dn-cinema-replay{background:#10283b;color:#fff;border:1px solid #68bac3}
+.dn-cinema-flash{position:absolute;inset:0;background:#d7ff35;opacity:0;pointer-events:none}.dn-cinema-ready .dn-cinema-flash{animation:dn-camera-flash 1.5s 1}
+@keyframes dn-sweep{from{transform:rotate(-30deg)}to{transform:rotate(40deg)}}@keyframes dn-drop{from{opacity:0;transform:translateY(-25px)}to{opacity:1;transform:translateY(0)}}@keyframes dn-screen-in{from{opacity:0;transform:translateY(120px) rotateX(35deg) scale(.65)}to{opacity:1;transform:rotateX(8deg) scale(1)}}@keyframes dn-pulse{to{opacity:.6;transform:scale(1.08)}}@keyframes dn-crowd{to{transform:translateY(6px)}}@keyframes dn-camera-flash{10%{opacity:.8}25%,100%{opacity:0}}
+@media(max-width:650px){.dn-cinema-venue{height:74vh}.dn-cinema-screen{min-height:42%;padding:25px 9px}.dn-cinema-logo{letter-spacing:-1px}.dn-cinema-title{letter-spacing:3px}.dn-cinema-controls button{padding:10px 12px;font-size:11px}.dn-cinema-stage{height:42px}}
+@media(prefers-reduced-motion:reduce){.dn-cinematic *{animation:none!important;transition:none!important}}
+`;document.head.appendChild(cinemaCss);
 
 let showBoard=true;
 window.draftShowBoard=()=>{showBoard=!showBoard;render()};
