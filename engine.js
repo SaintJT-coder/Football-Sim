@@ -66,6 +66,8 @@ function game(g){
  b.off+=staffBonus(g.b,'offensiveCoordinator');b.def+=staffBonus(g.b,'defensiveCoordinator');
  const context=gameContext(g),weather=context.weather;
  const weatherPenalty=weather==='Rain'?-1:weather==='Snow'?-3:weather==='Wind'?-2:weather==='Extreme Cold'?-2:0;
+ const boost=t=>{const ps=roster(t).filter(p=>p.injury<=0).slice(0,12);return ps.length?ps.reduce((v,p)=>v+(window.GMDevelopment?.abilityBoost(p,{playType:'pass',scheme:window.GMFranchise?.scheme(state,t,'offense')})||0),0)/ps.length:0};
+ a.off*=1+boost(g.a);b.off*=1+boost(g.b);
  const sa=clamp(points(a.off,b.def,true)+Math.round(context.homeField-1.5)+context.homeStreak+weatherPenalty,0,56),sb=clamp(points(b.off,a.def,false)+context.awayStreak+weatherPenalty,0,56);
  const teamLines=[];
  g.sa=sa===sb?sa+3:sa;g.sb=sb;g.year=state.year;
@@ -112,13 +114,15 @@ function simulateV2(){
  setup();
  if(state.week>18){endSeasonV2();return}
  const games=state.engine.schedule.filter(g=>g.week===state.week);
+ const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
  if(!games.length){state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
  for(const g of games){const result=game({...g});state.results.push(result)}
+ window.GMDevelopment?.weekly(state,devBefore);
  for(const p of state.players){
   const recovery=plan==='Recovery'?18:plan==='Development'?7:12;
   p.fatigue=clamp(p.fatigue-recovery+(intensity==='High'?5:intensity==='Low'?-5:0),0,100);
-  if(p.age<29&&p.rating<p.pot&&p.development>=5){p.rating++;p.development-=5}
+  if(!window.GMDevelopment&&p.age<29&&p.rating<p.pot&&p.development>=5){p.rating++;p.development-=5}
  }
  e.trainingPoints=clamp((e.trainingPoints||0)+(plan==='Development'?5:plan==='Recovery'?2:3),0,30);
  const rec=record(state.team);e.jobSecurity=clamp((e.jobSecurity??60)+(rec.w>=rec.l?2:-2),0,100);
@@ -167,7 +171,7 @@ function endSeasonV2(){
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
   if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){state.retired.push({...p,retiredYear:state.year});p.team=-2}
   else if(p.years<=0){p.team=-1;p.years=1}
-  p.rating=clamp(p.rating+(p.age<27?rand(0,2):p.age>31?rand(-3,0):rand(-1,1)),45,p.pot);
+  if(window.GMDevelopment)GMDevelopment.aging(p);else p.rating=clamp(p.rating+(p.age<27?rand(0,2):p.age>31?rand(-3,0):rand(-1,1)),45,p.pot);
   p.stats={yards:0,td:0,tackles:0,sacks:0};
  }
  state.year++;state.week=1;state.results=[];state.cash+=35;state.deadCap=0;
