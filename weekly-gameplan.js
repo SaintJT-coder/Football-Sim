@@ -42,9 +42,12 @@ function init(s){
  const current=key(s);
  x.plans[current]??={...x.plan};
  x.focuses[current]??=[];x.elevations[current]??=[];
- // Ensure that stale temporary elevation flags cannot carry into a new game week.
- for(const p of s.players||[])if(p.weeklyElevation?.active&&p.weeklyElevation.key!==current)
-   p.weeklyElevation.active=false;
+ // Only scan the roster once per game week, not on every team-strength calculation.
+ if(x.lastSanitizedKey!==current){
+   for(const p of s.players||[])if(p.weeklyElevation?.active&&p.weeklyElevation.key!==current)
+     p.weeklyElevation.active=false;
+   x.lastSanitizedKey=current;
+ }
  return x;
 }
 function plan(s){
@@ -126,7 +129,9 @@ function focus(s,id,mode){
 }
 function playerBoost(p,s){
  if(!p||!s)return 0;
- const x=init(s),active=x.focuses[key(s)]||[];
+ const x=s.weeklyOperations;
+ if(!x||x.season!==s.year)return 0;
+ const active=x.focuses?.[key(s)]||[];
  const tech=active.some(f=>String(f.playerId)===String(p.id)&&f.mode==='TECHNIQUE');
  const elevated=p.weeklyElevation?.active&&p.weeklyElevation.key===key(s);
  return (tech?CONFIG.focus.techniqueRating:0)+(elevated?CONFIG.elevation.temporaryRating:0);
