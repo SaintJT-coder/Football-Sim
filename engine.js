@@ -67,6 +67,10 @@ function game(g){
  a.def+=staffBonus(g.a,'defense')+(g.a===state.team?(coach?.defSynergy||0)*.3:0);
  b.off+=staffBonus(g.b,'offense')+staffBonus(g.b,'special')*.2+(g.b===state.team?(coach?.offSynergy||0)*.3:0);
  b.def+=staffBonus(g.b,'defense')+(g.b===state.team?(coach?.defSynergy||0)*.3:0);
+ const weeklyHome=window.GMWeeklyGameplan?.matchup(state,g,g.a);
+ const weeklyAway=window.GMWeeklyGameplan?.matchup(state,g,g.b);
+ if(weeklyHome){a.off+=weeklyHome.offense;a.def+=weeklyHome.defense}
+ if(weeklyAway){b.off+=weeklyAway.offense;b.def+=weeklyAway.defense}
  const context=gameContext(g),weather=context.weather;
  const rivalry=window.GMSimPresentation?.pregameBoost(state,g,g.a)||0;
  const rivalryB=window.GMSimPresentation?.pregameBoost(state,g,g.b)||0;
@@ -126,6 +130,7 @@ function simulateV2(){
  setup();
  if(state.week>18){endSeasonV2();return}
  if(window.GMRosterRules){const check=GMRosterRules.validate(state,state.team);if(!check.ok){alert(check.issues.join(', '));return}}
+ window.GMWeeklyGameplan?.beginWeek(state);
  const games=state.engine.schedule.filter(g=>g.week===state.week);
  window.GMContractsAdvanced?.weekly(state);
  window.GMStaff?.weekly(state);
@@ -134,11 +139,12 @@ function simulateV2(){
  window.GMRosterRules?.weekly(state);
  window.GMInjuries?.weekly(state);
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
- if(!games.length){window.Gridiron?.emit('week:bye',{state,year:state.year,week:state.week});window.GMOwner?.weekly(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
+ if(!games.length){window.Gridiron?.emit('week:bye',{state,year:state.year,week:state.week});window.GMWeeklyGameplan?.finishWeek(state,devBefore);window.GMOwner?.weekly(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
  for(const g of games){const result=game({...g});state.results.push(result);window.GMSimPresentation?.report(state,result)}
  window.Gridiron?.emit('week:games-complete',{state,year:state.year,week:state.week,games:state.results.filter(g=>g.year===state.year&&g.week===state.week)});
  window.GMDevelopment?.weekly(state,devBefore);
+ window.GMWeeklyGameplan?.finishWeek(state,devBefore);
  window.GMPlayerPersonality?.midseason(state);
  if(window.GMContractsAdvanced)for(const p of state.players.filter(x=>x.team>=0))GMContractsAdvanced.incentiveCheck(p,state,{teamWins:record(p.team).w});
  for(const p of state.players){
