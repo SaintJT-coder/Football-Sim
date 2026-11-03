@@ -3,10 +3,10 @@
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const avg=(xs)=>xs.length?xs.reduce((s,n)=>s+n,0)/xs.length:0;
 const pick=(xs)=>xs[Math.floor(Math.random()*xs.length)];
-const depth=(team,pos,n=1)=>roster(team).filter(p=>p.pos===pos&&p.injury<=0).sort((a,b)=>b.rating-a.rating).slice(0,n);
-const scoreTeam=(team)=>{
+const depth=(team,pos,n=1)=>(window.GMFranchise?GMFranchise.depth(state,team,pos):roster(team).filter(p=>p.pos===pos).sort((a,b)=>b.rating-a.rating)).filter(p=>!(Number(p.injury)>0)).slice(0,n);
+const scoreTeam=(team)=>{ if(window.GMFranchise){const x=GMFranchise.score(state,team);return {off:x.offense,def:x.defense,spec:x.special};}
  const unit=(positions)=>avg(positions.flatMap(([pos,n])=>depth(team,pos,n).map(p=>p.rating*(1-(p.fatigue||0)*.003)+((p.morale??65)-65)*.06)));
- const off=unit([['QB',1],['RB',1],['WR',3],['TE',1],['OL',4]]);
+ const off=unit([['QB',1],['RB',1],['WR',3],['TE',1],['OL',5]]);
  const def=unit([['DL',3],['LB',3],['CB',2],['S',2]]);
  const spec=unit([['K',1]]);
  return {off:off||58,def:def||58,spec:spec||60};
@@ -30,6 +30,7 @@ const freshSchedule=()=>{
  return weeks.flat();
 };
 function setup(){
+ window.GMFranchise?.init(state);
  state.engine??={version:2,season:state.year,schedule:freshSchedule(),career:{},awards:[],playoffs:[],log:[]};
  let e=state.engine;
  if(e.season!==state.year){e.season=state.year;e.schedule=freshSchedule()}
@@ -51,17 +52,41 @@ const distribute=(players,total,field,weights)=>{
  let allocated=0;
  players.forEach((p,i)=>{let n=i===players.length-1?total-allocated:Math.max(0,Math.round(total*ws[i]/sum));allocated+=n;p.stats[field]=(p.stats[field]||0)+n});
 };
+function gameContext(g){
+ const weather=['Clear','Clear','Clear','Rain','Wind','Snow','Extreme Cold'][rand(0,6)];
+ const streak=t=>{let xs=state.results.filter(x=>x.year===state.year&&(x.a===t||x.b===t)).slice(-4).reverse(),n=0,sign=0;for(const x of xs){const won=x.a===t?x.sa>x.sb:x.sb>x.sa;const z=won?1:-1;if(sign&&z!==sign)break;sign=z;n+=z}return clamp(n,-4,4)};
+ const homeStreak=streak(g.a),awayStreak=streak(g.b);
+ return {weather,homeField:1.5+(state.week>=12?0.5:0)+(TEAMS[g.a][2]===TEAMS[g.b][2]?0.5:0),homeStreak,awayStreak};
+}
+function buildReport(g,context,teamLines){
+ const quarter=(points)=>{const w=[.19,.26,.24,.31].map(x=>x*(.75+Math.random()*.5)),sum=w.reduce((a,b)=>a+b,0);let out=w.map(x=>Math.floor(points*x/sum));let left=points-out.reduce((a,b)=>a+b,0);while(left-->0)out[rand(0,3)]++;return out};
+ const h=quarter(g.sa),a=quarter(g.sb);
+ return {weather:context.weather,quarters:{home:h,away:a},teams:teamLines,
+ summary:TEAMS[g.sa>g.sb?g.a:g.b][1]+' defeated '+TEAMS[g.sa>g.sb?g.b:g.a][1]+' '+Math.max(g.sa,g.sb)+'–'+Math.min(g.sa,g.sb)+' in '+context.weather.toLowerCase()+' conditions.',
+ keyInjuries:state.players.filter(p=>(p.team===g.a||p.team===g.b)&&p.injury>0).slice(0,5).map(p=>({name:p.name,team:p.team,weeks:p.injury}))};
+}
 function game(g){
  const a=scoreTeam(g.a),b=scoreTeam(g.b);
- const sa=points(a.off,b.def,true),sb=points(b.off,a.def,false);
+ const staffBonus=(team,role)=>team===state.team?((Number(state.staff?.[role]?.rating)||70)-70)*.06:0;
+ a.off+=staffBonus(g.a,'offensiveCoordinator');a.def+=staffBonus(g.a,'defensiveCoordinator');
+ b.off+=staffBonus(g.b,'offensiveCoordinator');b.def+=staffBonus(g.b,'defensiveCoordinator');
+ const context=gameContext(g),weather=context.weather;
+ const weatherPenalty=weather==='Rain'?-1:weather==='Snow'?-3:weather==='Wind'?-2:weather==='Extreme Cold'?-2:0;
+ const sa=clamp(points(a.off,b.def,true)+Math.round(context.homeField-1.5)+context.homeStreak+weatherPenalty,0,56),sb=clamp(points(b.off,a.def,false)+context.awayStreak+weatherPenalty,0,56);
+ const teamLines=[];
  g.sa=sa===sb?sa+3:sa;g.sb=sb;g.year=state.year;
  for(const [team,forPts,againstPts] of [[g.a,g.sa,g.sb],[g.b,g.sb,g.sa]]){
   const q=depth(team,'QB')[0],rbs=depth(team,'RB',3),receivers=[...depth(team,'WR',4),...depth(team,'TE',2)];
-  const passShare=clamp(.53+(scoreTeam(team).off-scoreTeam(team).def)*.002+noise(.1),.37,.73);
-  const totalYards=clamp(Math.round(290+(forPts-21)*5+noise(95)),120,590);
+  const scheme=window.GMFranchise?.scheme(state,team,'offense');
+  const gamePlan=team===state.team?state.gameplay||{}:{};
+  const bias=(scheme==='Air Raid'?.13:scheme==='Power Run'?-.13:scheme==='Spread Option'?.06:0)+(gamePlan.offense==='PASS HEAVY'?.10:gamePlan.offense==='RUN HEAVY'?-.10:0);
+  const script=forPts<againstPts?.05:-.03;
+  const passShare=clamp(.53+bias+script+(scoreTeam(team).off-scoreTeam(team).def)*.002+noise(.1),.31,.81);
+  const totalYards=clamp(Math.round(290+(forPts-21)*5+noise(95)+(weather==='Snow'?-35:weather==='Wind'?-15:0)+(gamePlan.tempo==='AGGRESSIVE'?15:gamePlan.tempo==='CONSERVATIVE'?-12:0)),120,590);
   const passYards=Math.round(totalYards*passShare),rushYards=totalYards-passYards;
   const tds=Math.min(7,Math.floor(forPts/7));
-  if(q){let attempts=clamp(Math.round(30+noise(12)),16,52),completion=clamp(.49+(q.rating-60)*.004+noise(.12),.42,.79);
+  const previousInts=q?(q.stats.interceptions||0):0;
+  if(q){let attempts=clamp(Math.round(30+(passShare-.53)*35+noise(12)),16,52),completion=clamp(.49+(q.rating-60)*.004+noise(.12)+(weather==='Rain'?-.035:weather==='Snow'?-.065:weather==='Wind'?-.045:0),.35,.79);
    q.stats.attempts+=attempts;q.stats.completions+=Math.round(attempts*completion);
    q.stats.passYards+=passYards;q.stats.passTD+=Math.max(0,Math.round(tds*passShare));
    q.stats.interceptions+=Math.random()<clamp(.2-(q.rating-70)*.003,.03,.24)?1:0;
@@ -71,19 +96,22 @@ function game(g){
   distribute(receivers,passYards,'receivingYards',p=>Math.max(1,p.rating-48)*(p.pos==='WR'?1.2:.8));
   distribute(receivers,Math.round(passYards/12),'receptions',p=>Math.max(1,p.rating-48));
   distribute(rbs,Math.max(0,tds-Math.round(tds*passShare)),'rushTD',p=>Math.max(1,p.rating-48));
-  for(const p of [...rbs,...receivers]){let yards=(p.stats.rushYards||0)+(p.stats.receivingYards||0);p.stats.yards=yards;p.stats.td=(p.stats.rushTD||0)+(p.stats.recTD||0)}
+  for(const p of [...rbs,...receivers]){p.stats.yards=(p.stats.rushYards||0)+(p.stats.receivingYards||0);p.stats.td=(p.stats.rushTD||0)+(p.stats.recTD||0)}
+  const thirdDownAttempts=rand(9,16),thirdDownConversions=clamp(Math.round(thirdDownAttempts*(.32+(scoreTeam(team).off-65)*.003+noise(.08))),0,thirdDownAttempts);
+  teamLines.push({team,points:forPts,totalYards,passYards,rushYards,passShare:+passShare.toFixed(2),thirdDownAttempts,thirdDownConversions,turnovers:q?Math.max(0,(q.stats.interceptions||0)-previousInts):0});
   const defense=roster(team).filter(p=>['DL','LB','CB','S'].includes(p.pos)&&!p.injury);
   distribute(defense,clamp(Math.round(50+noise(14)),35,75),'tackles',p=>p.rating);
   distribute(defense.filter(p=>['DL','LB'].includes(p.pos)),clamp(Math.round((35-againstPts)/12+noise(2)),0,5),'sacks',p=>p.rating);
   for(const p of roster(team)){
    p.stats.games++;p.fatigue=clamp((p.fatigue||0)+rand(5,14),0,100);
    const injuryRisk=.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0);
-   if(p.injury>0){p.injury--;continue}
+   if(Number(p.injury)>0){p.injury--;continue}
    if(Math.random()<injuryRisk){p.injury=rand(1,5);state.news.unshift(p.name+' suffered an injury ('+p.injury+' weeks)')}
    p.morale=clamp(p.morale+(forPts>againstPts?rand(0,3):-rand(0,3)),15,100);
    p.development+=Math.max(0,(p.pot-p.rating))*Math.max(.05,(31-p.age)/100);
   }
  }
+ g.report=buildReport(g,context,teamLines);
  return g;
 }
 function simulateV2(){
@@ -127,7 +155,7 @@ function endSeasonV2(){
   p.rating=clamp(p.rating+(p.age<27?rand(0,2):p.age>31?rand(-3,0):rand(-1,1)),45,p.pot);
   p.stats={yards:0,td:0,tackles:0,sacks:0};
  }
- state.year++;state.week=1;state.results=[];state.cash+=35;
+ state.year++;state.week=1;state.results=[];state.cash+=35;state.deadCap=0;
  state.engine.season=state.year;state.engine.schedule=freshSchedule();
  state.news.unshift(TEAMS[champ][1]+' won the '+(state.year-1)+' championship!');
  save();render();

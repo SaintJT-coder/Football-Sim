@@ -25,13 +25,13 @@ function prospectRows(list,action=true){return list.map(p=>'<div class="card" st
 function aiDraft(pick){const f=init(),pool=f.prospects.filter(p=>!p.drafted);if(!pool.length)return;pool.sort((a,b)=>(b.rating+b.pot*.2+need(pick.owner,b.pos)*.45)-(a.rating+a.pot*.2+need(pick.owner,a.pos)*.45));selectProspect(pool[0],pick)}
 function selectProspect(p,pick){const f=init();if(!p||p.drafted||!pick||pick.used)return false;
  p.drafted=true;pick.used=true;
- const newId=Math.max(...state.players.map(x=>x.id))+1;
+ const newId=Math.max(0,...state.players.map(x=>Number(x.id)||0))+1;
  const salary=+(Math.max(.7,5.2-pick.round*.57-pick.slot*.035)).toFixed(2);
  state.players.push({id:newId,name:p.name,pos:p.pos,age:p.age,rating:p.rating,pot:p.pot,salary,team:pick.owner,stats:{yards:0,td:0,tackles:0,sacks:0},injury:0,years:4,target:false,fatigue:0,morale:70,development:0,rookie:true,devTrait:p.dev});
  f.draftLog.push({pick:pick.id,team:pick.owner,player:p.name,prospectId:p.id,pos:p.pos,overall:p.rating,round:pick.round});
  state.news.unshift('Draft: '+TEAMS[pick.owner][1]+' selected '+p.name+' ('+p.pos+')');
  save();return true}
-function draftProspect(id){const f=init(),pick=currentPick();if(!pick)return notice('Draft complete');if(pick.owner!==state.team)return notice('AI team is on the clock. Advance to your pick.');let p=f.prospects.find(x=>x.id===id);if(!p||p.drafted)return;const projectedSalary=Math.max(.7,5.2-pick.round*.57-pick.slot*.035);selectProspect(p,pick);render()}
+function draftProspect(id){const f=init(),pick=currentPick();if(!pick)return notice('Draft complete');if(pick.owner!==state.team)return notice('AI team is on the clock. Advance to your pick.');let p=f.prospects.find(x=>x.id===id);if(!p||p.drafted)return;selectProspect(p,pick);render()}
 function advanceDraft(){let f=init(),pick=currentPick();if(!pick)return notice('Draft complete');let count=0;while((pick=currentPick())&&pick.owner!==state.team&&count<84){aiDraft(pick);count++}save();render()}
 function autoDraft(){let f=init(),count=0;while(currentPick()&&count<84){aiDraft(currentPick());count++}save();render()}
 function draftPage(){let f=init(),pick=currentPick(),left=f.prospects.filter(p=>!p.drafted),mine=f.picks.filter(p=>p.owner===state.team&&!p.used);return title('NFL-Style Rookie Draft','Seven rounds · 12 fictional clubs · 84 picks · player development traits','DRAFT WAR ROOM')
@@ -46,12 +46,12 @@ function scoutingPage(){let f=init();return title('Scouting Department','Spend p
  +heading('TEAM NEEDS')+'<div class="grid three">'+allPos.map(pos=>metric(pos+' need',Math.round(need(state.team,pos)))).join('')+'</div>'
  +heading('SCOUTING REPORTS')+prospectRows(f.prospects.filter(p=>!p.drafted).sort((a,b)=>b.projection-a.projection).slice(0,50),false)}
 const itemKey=(x)=>x.kind+':'+x.id;
-const value=(x,team)=>x.kind==='pick'?pickValue(init().picks.find(p=>p.id===x.id)||{round:7,slot:12}):playerValue(state.players.find(p=>p.id===x.id),team);
+const value=(x,team)=>x.kind==='pick'?pickValue(init().picks.find(p=>p.id===x.id)||{round:7,slot:12}):playerValue(state.players.find(p=>String(p.id)===String(x.id))||{rating:50,pot:50,age:30,pos:'QB',salary:0},team);
 function tradeItems(team){let f=init();return [...roster(team).map(p=>({kind:'player',id:p.id,name:p.name+' · '+p.pos+' · '+p.rating+' OVR · '+cash(p.salary),val:Math.round(playerValue(p,team))})),...f.picks.filter(p=>p.owner===team&&!p.used).map(p=>({kind:'pick',id:p.id,name:'R'+p.round+' Pick '+p.slot+' ('+p.id+')',val:pickValue(p)}))]}
 function toggleAsset(side,kind,id){let f=init(),list=side==='out'?f.selectedOut:f.selectedIn,key=kind+':'+id,index=list.findIndex(x=>itemKey(x)===key);if(index<0){if(list.length>=6)return notice('Maximum six assets per side');list.push({kind,id})}else list.splice(index,1);f.counter=null;render()}
 function tradeValue(items,recipient){return items.reduce((sum,x)=>sum+value(x,recipient),0)}
 function tradeAssessment(){let f=init(),other=state.selectedTrade;let ours=tradeValue(f.selectedOut,other),theirs=tradeValue(f.selectedIn,state.team);
- const otherNeeds=f.selectedOut.filter(x=>x.kind==='player').reduce((s,x)=>s+need(other,state.players.find(p=>p.id===x.id)?.pos||'QB')*.5,0);
+ const otherNeeds=f.selectedOut.filter(x=>x.kind==='player').reduce((s,x)=>s+need(other,state.players.find(p=>String(p.id)===String(x.id))?.pos||'QB')*.5,0);
  const expected=theirs*(1.07+Math.max(0,record(other).l-record(other).w)*.008);
  return {ours,theirs,expected,otherNeeds,accepted:ours+otherNeeds>=expected}}
 function propose(){let f=init(),other=state.selectedTrade;if(state.week>12)return notice('Trade deadline has passed');if(!f.selectedOut.length||!f.selectedIn.length)return notice('Select assets from both teams');
