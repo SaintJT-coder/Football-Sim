@@ -18,7 +18,11 @@ const CONFIG={
   focus:{cost:3,maxPerWeek:3,techniqueRating:2,recoveryFatigue:12,
     filmXP:85,filmMorale:1,modes:['TECHNIQUE','RECOVERY','FILM']},
   elevation:{maxPerWeek:2,maxPerPlayerSeason:3,temporaryRating:1},
-  practice:{winnerMorale:2,maxReports:40},
+  practice:{winnerMorale:2,maxReports:40,
+    scoreWeights:{passYards:.025,passTD:8,rushYards:.075,receivingYards:.075,
+      receptions:.4,rushTD:6,tackles:.75,sacks:5,interceptions:2}},
+  matchup:{topPlayers:6,fallbackRating:60},
+  ui:{maxFocusCandidates:50},
   report:{latest:8}
 };
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,Number(n)||0));
@@ -79,8 +83,8 @@ function opponent(s){
 function opponentUnit(s,team,positions){
  const candidates=s.players.filter(p=>p.team===team&&positions.includes(p.pos)&&
    isActive(p)&&Number(p.injury||0)<=0);
- if(!candidates.length)return 60;
- const strongest=candidates.slice().sort((a,b)=>b.rating-a.rating).slice(0,Math.min(6,candidates.length));
+ if(!candidates.length)return CONFIG.matchup.fallbackRating;
+ const strongest=candidates.slice().sort((a,b)=>b.rating-a.rating).slice(0,Math.min(CONFIG.matchup.topPlayers,candidates.length));
  return strongest.reduce((a,p)=>a+(p.rating||60),0)/strongest.length;
 }
 function matchup(s,g,team){
@@ -197,9 +201,7 @@ function releaseElevations(s){
 }
 function practiceScore(p,before={}){
  const stat=p.stats||{},d=k=>Math.max(0,(Number(stat[k])||0)-(Number(before[k])||0));
- return d('passYards')*.025+d('passTD')*8+d('rushYards')*.075+
-   d('receivingYards')*.075+d('receptions')*.4+d('rushTD')*6+
-   d('tackles')*.75+d('sacks')*5+d('interceptions')*2;
+ return Object.entries(CONFIG.practice.scoreWeights).reduce((total,[field,weight])=>total+d(field)*weight,0);
 }
 function finishWeek(s,before){
  const x=init(s),k=key(s);
@@ -265,7 +267,7 @@ function page(s){
  '<div class="card"><h2>02 / PLAYER FOCUS · '+entries.length+'/'+max+'</h2>'+
  '<p class="muted">Technique: temporary +'+CONFIG.focus.techniqueRating+' simulated OVR. Recovery: -'+CONFIG.focus.recoveryFatigue+
  ' fatigue now. Film: '+CONFIG.focus.filmXP+' XP and +1 morale. Focus uses the existing Training Lab points.</p>'+
- '<div style="max-height:320px;overflow:auto">'+active.slice(0,50).map(v=>{
+ '<div style="max-height:320px;overflow:auto">'+active.slice(0,CONFIG.ui.maxFocusCandidates).map(v=>{
    const selected=entries.find(e=>String(e.playerId)===String(v.id));
    return '<div class="row" style="gap:8px;flex-wrap:wrap;border-bottom:1px solid #303744;padding:8px 0">'+
      '<span><b>'+escape(v.name)+'</b> · '+escape(v.pos)+' · '+v.rating+' OVR · Fatigue '+Math.round(v.fatigue||0)+'</span>'+
