@@ -1,0 +1,31 @@
+/* Save manager: independent slots, import/export and experimental branches. */
+(function(w){'use strict';
+const KEY='gridiron-gm-save',INDEX='gridiron-gm-save-index-v3',PREFIX='gridiron-gm-slot-v3:',CURRENT='gridiron-gm-current-slot-v3';
+const read=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}};
+const clone=v=>JSON.parse(JSON.stringify(v));
+const valid=s=>s&&Number.isInteger(s.year)&&Number.isInteger(s.week)&&Array.isArray(s.players)&&Number.isInteger(s.team);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
+const index=()=>Array.isArray(read(INDEX))?read(INDEX):[];
+const id=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+const activeId=()=>localStorage.getItem(CURRENT);
+const meta=(s,name,branchOf)=>({name:String(name||'Franchise').slice(0,80),year:s.year,week:s.week,team:s.team,lastPlayed:new Date().toISOString(),branchOf:branchOf||null});
+function write(s,name,slotId,branchOf){if(!valid(s))throw Error('Invalid franchise state');const key=slotId||id(),entries=index(),previous=entries.find(x=>x.id===key);const info={id:key,...meta(s,name||previous?.name,branchOf===undefined?previous?.branchOf:branchOf)};localStorage.setItem(PREFIX+key,JSON.stringify(s));const updated=[info,...entries.filter(x=>x.id!==key)];localStorage.setItem(INDEX,JSON.stringify(updated));return info}
+function snapshot(s){const key=activeId();if(!key)return;const info=index().find(x=>x.id===key);if(!info)return;write(s,info.name,key)}
+function create(s,name){const info=write(s,name);localStorage.setItem(CURRENT,info.id);return info}
+function activate(slotId){const entry=index().find(x=>x.id===slotId),data=read(PREFIX+slotId);if(!entry||!valid(data))throw Error('Save slot is missing or invalid');localStorage.setItem(CURRENT,slotId);localStorage.setItem(KEY,JSON.stringify(data));return clone(data)}
+function branch(s,name){const parent=activeId();const info=write(clone(s),name||'What If: '+(index().find(x=>x.id===parent)?.name||'Franchise'),undefined,parent);localStorage.setItem(CURRENT,info.id);localStorage.setItem(KEY,JSON.stringify(s));return info}
+function remove(slotId){const entries=index();if(!entries.some(x=>x.id===slotId))return;localStorage.removeItem(PREFIX+slotId);localStorage.setItem(INDEX,JSON.stringify(entries.filter(x=>x.id!==slotId)));if(activeId()===slotId)localStorage.removeItem(CURRENT)}
+function exportSave(slotId){const data=read(PREFIX+slotId),entry=index().find(x=>x.id===slotId);if(!valid(data)||!entry)throw Error('Save not found');const json=JSON.stringify({format:'gridiron-gm',version:3,metadata:entry,state:data},null,2);const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='gridiron-'+entry.name.replace(/[^a-z0-9-]/gi,'-').slice(0,35)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
+async function importSave(file){if(!file||file.size>20*1024*1024)throw Error('JSON file must be under 20 MB');const payload=JSON.parse(await file.text());if(payload.format!=='gridiron-gm'||!valid(payload.state))throw Error('Unsupported or invalid Gridiron save');return write(payload.state,payload.metadata?.name||'Imported Franchise')}
+function bootstrap(s){if(index().length||!valid(s))return;const info=write(s,'Original Franchise');localStorage.setItem(CURRENT,info.id)}
+function page(s){bootstrap(s);const entries=index(),current=activeId();return '<div class="eyebrow">FRANCHISE DATA CENTER</div><h1 class="heading">SAVE MANAGER</h1><p class="sub">Named saves, downloadable backups and parallel-universe branches. Your current franchise remains active until you load another.</p><div class="card"><button class="primary" onclick="gmSaveNew()">SAVE AS NEW SLOT</button> <button onclick="gmSaveCurrent()">SAVE CURRENT</button> <button onclick="gmWhatIf()">CREATE WHAT IF BRANCH</button> <button onclick="document.getElementById(\'gm-import-json\').click()">IMPORT JSON</button><input id="gm-import-json" type="file" accept=".json,application/json" style="display:none" onchange="gmImportSave(this.files[0])"></div><div class="grid two">'+entries.map(e=>'<div class="card"><div class="eyebrow">'+(e.id===current?'ACTIVE · ':'')+(e.branchOf?'WHAT IF BRANCH':'MAIN SAVE')+'</div><h3>'+esc(e.name)+'</h3><p>'+esc(String(e.year))+' · Week '+esc(String(e.week))+' · '+esc(new Date(e.lastPlayed).toLocaleString())+'</p><button onclick="gmLoadSlot(\''+e.id+'\')">LOAD</button> <button onclick="gmExportSlot(\''+e.id+'\')">EXPORT</button> <button onclick="gmDeleteSlot(\''+e.id+'\')">DELETE</button></div>').join('')+'</div>'}
+const api={index,activeId,bootstrap,snapshot,create,activate,branch,remove,exportSave,importSave,page};
+w.Gridiron?.register('saves',api);w.GMSaveManager=api;
+w.gmSaveNew=()=>{const name=prompt('Name this franchise save:','My Franchise');if(!name)return;try{create(state,name);save();render()}catch(e){alert(e.message)}};
+w.gmSaveCurrent=()=>{try{if(!activeId())create(state,'Franchise');else snapshot(state);save();render()}catch(e){alert(e.message)}};
+w.gmWhatIf=()=>{const name=prompt('Name your alternate universe:','What If: '+(index().find(x=>x.id===activeId())?.name||'Franchise'));if(!name)return;try{branch(state,name);save();render()}catch(e){alert(e.message)}};
+w.gmLoadSlot=slotId=>{if(!confirm('Load this franchise? Unsaved changes to the current game may be lost.'))return;try{activate(slotId);location.reload()}catch(e){alert(e.message)}};
+w.gmExportSlot=slotId=>{try{exportSave(slotId)}catch(e){alert(e.message)}};
+w.gmDeleteSlot=slotId=>{if(!confirm('Permanently delete this save slot?'))return;remove(slotId);render()};
+w.gmImportSave=async file=>{try{const entry=await importSave(file);alert('Imported '+entry.name+'. Choose LOAD to open it.');render()}catch(e){alert(e.message)}};
+})(window);
