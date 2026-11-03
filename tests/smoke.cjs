@@ -22,6 +22,22 @@ const {chromium}=require('playwright');
  if(after.results!==initial.results+6)throw Error('Expected 6 games per week, got '+(after.results-initial.results));
  if(after.schedule!==108)throw Error('Expected 108 scheduled games, got '+after.schedule);
  if(!after.report?.quarters)throw Error('Missing game report');
+ await page.evaluate(()=>{page='Salary Cap';render()});
+ const beforeContract=await page.evaluate(()=>({cash:state.cash,years:roster()[0].years,id:roster()[0].id}));
+ await page.evaluate(id=>gmNegotiate(id),beforeContract.id);
+ const afterContract=await page.evaluate(id=>({cash:state.cash,years:state.players.find(p=>p.id===id).years}),beforeContract.id);
+ if(afterContract.years<beforeContract.years)throw Error('Contract extension corrupted years');
+ await page.evaluate(()=>{page='Combine';render()});
+ await page.evaluate(()=>{page='Coaching Staff';render()});
+ const staffCount=await page.locator('#app button[onclick^="gmHireStaff"]').count();
+ if(staffCount<3)throw Error('Coaching staff hiring buttons missing');
+ await page.evaluate(()=>{page='Depth Chart';render()});
+ const rosterBefore=await page.evaluate(()=>GMFranchise.depth(state,state.team,'QB').map(p=>p.id));
+ if(rosterBefore.length>1){
+  await page.evaluate(()=>gmMoveDepth('QB',1,-1));
+  const rosterAfter=await page.evaluate(()=>GMFranchise.depth(state,state.team,'QB').map(p=>p.id));
+  if(String(rosterAfter[0])!==String(rosterBefore[1]))throw Error('Depth reorder not persisted');
+ }
  await page.reload({waitUntil:'load'});
  const saved=await page.evaluate(()=>({week:state.week,results:state.results.length}));
  if(saved.week!==after.week||saved.results!==after.results)throw Error('Save failed to persist');
