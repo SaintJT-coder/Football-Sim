@@ -70,7 +70,10 @@ function gainXP(p,amount){
   if(p.attributes) p.attributes[key]=clamp((p.attributes[key]||p.rating)+1,1,99);
   p.rating=clamp(p.rating+1,1,Math.min(99,p.pot));
  }
- unlock(p);p.xp=d.xp;return xp;
+ if(d.totalXP>=11000&&p.rating>=92&&d.seasonGames>=12)d.trait='X-Factor';
+ else if(d.totalXP>=5200&&p.rating>=86&&d.seasonGames>=8&&TRAITS.indexOf(d.trait)<2)d.trait='Superstar';
+ else if(d.totalXP>=1800&&p.rating>=79&&d.seasonGames>=4&&TRAITS.indexOf(d.trait)<1)d.trait='Star';
+ p.devTrait=d.trait;unlock(p);p.xp=d.xp;return xp;
 }
 function performanceXP(p,before){
  const s=p.stats||{},diff=k=>Math.max(0,(s[k]||0)-(before?.[k]||0));
