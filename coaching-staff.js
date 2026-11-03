@@ -196,17 +196,20 @@ function seasonEnd(s,random=Math.random){
    c.overall=overall(c);
  }
  const roles=['offense','defense','special'];
- // Include all teams. Strong coordinators can be hired by another AI team.
+ const alreadyMoved=new Set();
+ // Include all teams; each opening/coach can take part in at most one move.
  for(let team=0;team<size&&events.length<CONFIG.poaching.maxMovesPerSeason;team++){
    for(const role of roles){
      if(events.length>=CONFIG.poaching.maxMovesPerSeason)break;
+     if(alreadyMoved.has(team+'|'+role))continue;
      const c=x.teams[team][role],chance=role==='offense'?CONFIG.poaching.chanceOffense:
        role==='defense'?CONFIG.poaching.chanceDefense:CONFIG.poaching.chanceSpecial;
      if(overall(c)<CONFIG.poaching.minimumRating||c.retainedThrough>=s.year+1||random()>=chance)continue;
      if(size<2)continue;
-     const candidates=Array.from({length:size},(_,i)=>i).filter(t=>t!==team&&t!==s.team);
+     const candidates=Array.from({length:size},(_,i)=>i).filter(t=>t!==team&&t!==s.team&&!alreadyMoved.has(t+'|'+role));
      if(!candidates.length)continue;
      const destination=candidates[Math.min(candidates.length-1,Math.floor(random()*candidates.length))];
+     alreadyMoved.add(team+'|'+role);alreadyMoved.add(destination+'|'+role);
      const previous=x.teams[destination][role];x.freeAgents.unshift(previous);
      const moved={...c,yearsOnStaff:0,retainedThrough:0};
      x.teams[destination][role]=moved;
