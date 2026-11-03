@@ -181,6 +181,7 @@ function endSeasonV2(){
  const mvp=[...state.players].filter(p=>p.pos==='QB').sort((a,b)=>(b.stats.passYards+b.stats.passTD*20-b.stats.interceptions*35)-(a.stats.passYards+a.stats.passTD*20-a.stats.interceptions*35))[0];
  state.awards.push({year:state.year,mvp:mvp?.name||'—'});
  window.GMOwner?.seasonEnd(state,{champion:champ===state.team,playoffs:playoffs.some(g=>g.a===state.team||g.b===state.team),division:seeded.some(c=>c[0]?.i===state.team)});
+ window.GMSeasonRecap?.generate(state,standings,playoffs,state.awards);
  state.engine.playoffs=playoffs;state.engine.playoffYear=state.year;state.engine.awards.push(state.awards.at(-1));
  window.GMContractsAdvanced?.season(state,Object.fromEntries(TEAMS.map((_,i)=>[i,{teamWins:record(i).w,playoffs:playoffs.some(g=>g.a===i||g.b===i)}])));
  for(const p of state.players){
