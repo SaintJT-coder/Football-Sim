@@ -42,10 +42,30 @@ function combine(p){
  return cache[p.id]={forty:clamp(forty,4.25,5.65),vertical:Math.round(clamp(25+(athletic-65)*.32+n(-4,4),20,46)),broad:Math.round(clamp(105+(athletic-65)*.4+n(-6,6),90,145)),threeCone:+clamp(7.55-(athletic-65)*.009+n(-.2,.2),6.4,8.2).toFixed(2),shuttle:+clamp(4.6-(athletic-65)*.007+n(-.12,.12),3.8,5.1).toFixed(2),bench:Math.round(clamp(16+(athletic-65)*.2+n(-7,7),5,40))};
 }
 function scoutPage(){
- init();const f=state.frontOffice;if(!f||!f.prospects?.length)return title('Scouting','Open the draft board to generate this year’s prospects.');
- return title('Scouting Combine','Athletic testing and progressive scouting reports. Scouting depth affects which ratings are visible.','COLLEGE SCOUTING')
- +'<div class="card"><label>Position focus <select class="input" onchange="gmFocus(this.value)">'+['ALL',...POS].map(x=>'<option '+(state.draftPolish.focus===x?'selected':'')+'>'+x+'</option>').join('')+'</select></label><p class="muted small">Scout points: '+(state.upgrades.scoutPoints??20)+' · Head scout: '+state.staff.headScout.rating+'</p></div>'
- +f.prospects.filter(p=>!p.drafted&&(state.draftPolish.focus==='ALL'||p.pos===state.draftPolish.focus)).sort((a,b)=>b.projection-a.projection).slice(0,60).map(p=>{const level=f.scouted[p.id]||0,c=level>=1?combine(p):null;return '<div class="card" style="margin:10px 0"><div class="row"><b>'+esc(p.name)+' · '+esc(p.pos)+'</b><span>SCOUT '+level+'/3</span></div><p class="muted small">Projected grade '+p.projection+' · '+(level>=1?'40: '+c.forty+'s · Vertical: '+c.vertical+'″ · Broad: '+c.broad+'″ · 3-cone: '+c.threeCone+'s · Shuttle: '+c.shuttle+'s · Bench: '+c.bench:'Combine results locked until first scout')+'</p><p>'+(level>=2?'Skills estimate: '+Math.round(p.rating/5)*5+' ± 5':'Skills hidden')+' · '+(level>=3?'OVR '+p.rating+' · Potential '+p.pot+' · Development '+esc(p.dev):'Development hidden')+'</p><button onclick="scoutProspect(\''+p.id+'\')" '+(level>=3?'disabled':'')+'>Scout prospect</button></div>'}).join('');
+ init();
+ const f=state.frontOffice;
+ if(!f?.prospects?.length)return title('Scouting','Open the draft board to generate this year’s prospects.');
+ const source=window.GMDraftRealism;
+ return title('Scouting Combine','Published grades improve with scouting and review. True ratings remain hidden until drafted.','COLLEGE SCOUTING')
+ +'<div class="card"><label>Position focus <select class="input" onchange="gmFocus(this.value)">'+['ALL',...POS].map(x=>'<option '+(state.draftPolish.focus===x?'selected':'')+'>'+x+'</option>').join('')+'</select></label><p class="muted small">Scout points: '+(state.upgrades.scoutPoints??20)+' · Head scout: '+state.staff.headScout.rating+'</p><button onclick="page=\'Draft Combine\';render()">OPEN COMBINE & PRO DAY</button></div>'
+ +f.prospects.filter(p=>!p.drafted&&(state.draftPolish.focus==='ALL'||p.pos===state.draftPolish.focus))
+   .slice().sort((a,b)=>b.projection-a.projection).slice(0,60).map(p=>{
+     const level=f.scouted?.[p.id]||0,report=source?.publicGrade(p,state),
+       combineReport=report?.combine||null;
+     const grade=report?report.overall+' ± '+report.margin:p.projection+' ± 10';
+     const confidence=report?report.confidence+'% confidence':'Unverified';
+     const measurements=combineReport?
+       '40: '+combineReport.forty+'s · Vertical: '+combineReport.vertical+
+       '″ · Shuttle: '+combineReport.shuttle+'s · Bench: '+combineReport.bench:
+       'Combine results not yet reviewed';
+     return '<div class="card" style="margin:10px 0"><div class="row"><b>'+esc(p.name)+' · '+esc(p.pos)+
+       '</b><span>SCOUT '+level+'/3</span></div><p class="muted small">'+
+       'Projected grade '+esc(grade)+' · '+confidence+
+       ' · '+esc(measurements)+'</p><p>'+
+       (level>=2?'Detailed scout confidence available':'Scouting detail locked')+
+       ' · Exact OVR, ceiling and development trait remain unknown until drafted.</p>'+
+       '<button onclick="scoutProspect(\''+p.id+'\')" '+(level>=3?'disabled':'')+'>Scout prospect</button></div>';
+   }).join('');
 }
 window.gmFocus=value=>{if(!['ALL',...POS].includes(value))return;state.draftPolish.focus=value;save();render()};
 const oldRender=render;
