@@ -3,7 +3,7 @@
 const KEY='gridiron-gm-save',INDEX='gridiron-gm-save-index-v3',PREFIX='gridiron-gm-slot-v3:',CURRENT='gridiron-gm-current-slot-v3';
 const read=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}};
 const clone=v=>JSON.parse(JSON.stringify(v));
-const valid=s=>s&&Number.isInteger(s.year)&&Number.isInteger(s.week)&&Array.isArray(s.players)&&Number.isInteger(s.team);
+const valid=s=>!!(s&&Number.isInteger(s.year)&&s.year>=1900&&s.year<=2500&&Number.isInteger(s.week)&&s.week>=1&&s.week<=30&&Array.isArray(s.players)&&s.players.length>0&&s.players.length<=10000&&Number.isInteger(s.team)&&s.team>=0&&s.team<(w.TEAMS?.length||32));
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const index=()=>Array.isArray(read(INDEX))?read(INDEX):[];
 const id=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
