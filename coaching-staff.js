@@ -239,8 +239,8 @@ function page(s){
  '<div class="card"><h3>JOB SECURITY</h3><h1>'+Math.round(owner?.jobSecurity??70)+'%</h1><p>Owner confidence</p></div>'+
  '<div class="card"><h3>FRANCHISE CASH</h3><h1>$'+Number(s.cash||0).toFixed(1)+'M</h1><p>For hiring and retention</p></div></div>'+
  (conflict?.status==='UNRESOLVED'?'<div class="card"><h2>OWNER–COACH CONFLICT</h2><p>'+safe(conflict.reason)+'</p><p>Choose how to handle the disagreement:</p>'+
- '<button onclick="gmStaffConflict(\'owner\')">BACK OWNERSHIP</button> <button onclick="gmStaffConflict(\'coach\')">BACK COACH</button> <button onclick="gmStaffConflict(\'compromise\')">COMPROMISE</button></div>':
- '<div class="card"><h3>FRANCHISE ALIGNMENT</h3><p>'+(conflict?.year===s.year?'Conflict resolved: '+safe(conflict.choice):'Owner and coaching philosophy currently aligned.')+'</p></div>')+
+ '<button onclick="gmStaffConflict(\'owner\')">BACK OWNERSHIP · JOB +4 / MORALE -2</button> <button onclick="gmStaffConflict(\'coach\')">BACK COACH · JOB -4 / MORALE +3</button> <button onclick="gmStaffConflict(\'compromise\')">COMPROMISE · JOB +1 / MORALE +1</button></div>':
+ '<div class="card"><h3>FRANCHISE ALIGNMENT</h3><p>'+(conflict?.year===s.year?'Conflict resolved: '+safe(conflict.choice)+' · Job security '+(CONFIG.conflict[conflict.choice]?.security>=0?'+':'')+(CONFIG.conflict[conflict.choice]?.security||0)+' · Team morale '+(CONFIG.conflict[conflict.choice]?.morale>=0?'+':'')+(CONFIG.conflict[conflict.choice]?.morale||0):'Owner and coaching philosophy currently aligned.')+'</p></div>')+
  '<div class="grid two">'+roles.map(role=>{
    const c=staff[role],eff=gameModifier(s,s.team,role),aff=c.affinities||[];
    return '<div class="card"><div class="eyebrow">'+CONFIG.roles[role].label+'</div><h2>'+safe(c.name)+'</h2>'+
