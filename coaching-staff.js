@@ -9,7 +9,8 @@ const CONFIG={
   special:{label:'Special Teams Coordinator',labelShort:'STC',schemes:['Balanced','Precision','Aggressive Returns'],weights:{strategy:.35,development:.2,communication:.25,adaptability:.2}},
   strength:{label:'Strength & Conditioning Coach',labelShort:'S&C',schemes:['Balanced','High Intensity','Recovery'],weights:{conditioning:.4,injuryPrevention:.3,development:.2,communication:.1}}
  },
- rating:{min:48,max:95,generatedBase:62,generatedRange:28,yearlyGrowthChance:.48,yearlyGrowth:1,maxGrowthPerSeason:2},
+ rating:{min:48,max:95,neutral:70,generatedBase:62,generatedRange:28,skillSpreadBase:-8,skillSpreadRange:18,ageBase:35,ageRange:24,experienceBase:4,experienceRange:18,yearlyGrowthChance:.48,yearlyGrowth:1,maxGrowthPerSeason:2},
+ freeAgentLimit:20,
  game:{perRatingPoint:.055,schemeMatch:.45,schemeMismatch:-.25,maxPoints:2.3,specialTeamsWeight:.25,offenseDisruption:-2.5},
  development:{perSkillPoint:.002,affinity:.045,schemeMatch:.025,strengthPerPoint:.0015,min:.80,max:1.15,offenseDisruption:.88},
  conditioning:{fatiguePerPoint:.055,injuryPerPoint:.004,fatigueMin:-1.2,fatigueMax:1.2,injuryMin:.88,injuryMax:1.12},
@@ -45,14 +46,14 @@ function makeCoach(team,role,year=2026,salt=0,base){
  const value=(key,n)=>hash(seed+'|'+key)%n;
  const starting=base==null?CONFIG.rating.generatedBase+value('base',CONFIG.rating.generatedRange):Number(base);
  const ratings={strategy:0,development:0,communication:0,adaptability:0,conditioning:0,injuryPrevention:0};
- for(const key of Object.keys(ratings))ratings[key]=clamp(starting-8+value(key,18),CONFIG.rating.min,CONFIG.rating.max);
+ for(const key of Object.keys(ratings))ratings[key]=clamp(starting+CONFIG.rating.skillSpreadBase+value(key,CONFIG.rating.skillSpreadRange),CONFIG.rating.min,CONFIG.rating.max);
  const name=FIRST[value('first',FIRST.length)]+' '+LAST[value('last',LAST.length)];
  const playbook=def.schemes[value('playbook',def.schemes.length)];
  const prefs=[playbook,def.schemes[(def.schemes.indexOf(playbook)+1+value('pref',def.schemes.length-1))%def.schemes.length]];
  const affinities=AFFINITIES[role],k=value('affinity',affinities.length);
  const c={id:'coach-'+team+'-'+role+'-'+year+'-'+salt,name,role,ratings,
    preferredSchemes:prefs,playbook,affinities:[affinities[k],affinities[(k+4)%affinities.length]],
-   age:35+value('age',24),yearsOnStaff:0,yearsCoaching:4+value('experience',18),
+   age:CONFIG.rating.ageBase+value('age',CONFIG.rating.ageRange),yearsOnStaff:0,yearsCoaching:CONFIG.rating.experienceBase+value('experience',CONFIG.rating.experienceRange),
    retainedThrough:0,interim:false};
  c.overall=overall(c);return c;
 }
@@ -84,7 +85,7 @@ function coachSchemeBonus(c,scheme){
 function isDisrupted(s,team,role){return !!s.staffV2?.disruptions?.[team]?.[role]&&s.staffV2.disruptions[team][role]===s.year}
 function gameModifier(s,team,role){
  const c=coach(s,team,role);if(!c)return 0;
- let delta=(overall(c)-70)*CONFIG.game.perRatingPoint+coachSchemeBonus(c,teamScheme(s,team,role));
+ let delta=(overall(c)-CONFIG.rating.neutral)*CONFIG.game.perRatingPoint+coachSchemeBonus(c,teamScheme(s,team,role));
  if(role==='offense'&&isDisrupted(s,team,role))delta+=CONFIG.game.offenseDisruption;
  if(role==='special')delta*=CONFIG.game.specialTeamsWeight;
  return clamp(delta,-CONFIG.game.maxPoints-(role==='offense'&&isDisrupted(s,team,role)?2:0),CONFIG.game.maxPoints);
@@ -96,17 +97,17 @@ function developmentMultiplier(p,s){
  const archetype=p.development?.archetype||'';
  const affinity=c.affinities?.includes(archetype)?CONFIG.development.affinity:0;
  const match=c.preferredSchemes?.includes(teamScheme(s,p.team,role))?CONFIG.development.schemeMatch:0;
- let multiplier=1+(Number(c.ratings?.development||70)-70)*CONFIG.development.perSkillPoint+
-   (Number(strength?.ratings?.development||70)-70)*CONFIG.development.strengthPerPoint+affinity+match;
+ let multiplier=1+(Number(c.ratings?.development||CONFIG.rating.neutral)-CONFIG.rating.neutral)*CONFIG.development.perSkillPoint+
+   (Number(strength?.ratings?.development||CONFIG.rating.neutral)-CONFIG.rating.neutral)*CONFIG.development.strengthPerPoint+affinity+match;
  if(role==='offense'&&isDisrupted(s,p.team,role))multiplier*=CONFIG.development.offenseDisruption;
  return clamp(multiplier,CONFIG.development.min,CONFIG.development.max);
 }
 function conditioning(p,s){
  const c=coach(s,p.team,'strength');if(!c)return {fatigueRecovery:0,injuryMultiplier:1};
  return {
-   fatigueRecovery:clamp(((c.ratings.conditioning||70)-70)*CONFIG.conditioning.fatiguePerPoint,
+   fatigueRecovery:clamp(((c.ratings.conditioning||CONFIG.rating.neutral)-CONFIG.rating.neutral)*CONFIG.conditioning.fatiguePerPoint,
      CONFIG.conditioning.fatigueMin,CONFIG.conditioning.fatigueMax),
-   injuryMultiplier:clamp(1-((c.ratings.injuryPrevention||70)-70)*CONFIG.conditioning.injuryPerPoint,
+   injuryMultiplier:clamp(1-((c.ratings.injuryPrevention||CONFIG.rating.neutral)-CONFIG.rating.neutral)*CONFIG.conditioning.injuryPerPoint,
      CONFIG.conditioning.injuryMin,CONFIG.conditioning.injuryMax)
  };
 }
@@ -178,7 +179,7 @@ function hire(s,role,index){
  const cost=CONFIG.hiring.baseCost+Math.round(overall(choice)*CONFIG.hiring.ratingSurcharge);
  if(s.cash<cost)return {ok:false,error:'Not enough franchise cash'};
  const staff=init(s),previous=staff.teams[s.team][role];staff.freeAgents.unshift(previous);
- staff.freeAgents.length=Math.min(staff.freeAgents.length,20);
+ staff.freeAgents.length=Math.min(staff.freeAgents.length,CONFIG.freeAgentLimit);
  s.cash=Math.round((s.cash-cost)*100)/100;staff.teams[s.team][role]=choice;
  s.news?.unshift('Hired '+choice.name+' as '+CONFIG.roles[role].label+'.');
  return {ok:true,coach:choice,cost};
@@ -225,7 +226,7 @@ function seasonEnd(s,random=Math.random){
    }
  }
  x.events.length=Math.min(x.events.length,CONFIG.logLimit);
- x.freeAgents.length=Math.min(x.freeAgents.length,20);
+ x.freeAgents.length=Math.min(x.freeAgents.length,CONFIG.freeAgentLimit);
  x.lastSeasonYear=s.year;
  return events;
 }
