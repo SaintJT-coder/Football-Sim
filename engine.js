@@ -3,7 +3,7 @@
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const avg=(xs)=>xs.length?xs.reduce((s,n)=>s+n,0)/xs.length:0;
 const pick=(xs)=>xs[Math.floor(Math.random()*xs.length)];
-const depth=(team,pos,n=1)=>roster(team).filter(p=>p.pos===pos&&!(Number(p.injury)>0)).sort((a,b)=>b.rating-a.rating).slice(0,n);
+const depth=(team,pos,n=1)=>(window.GMFranchise?GMFranchise.depth(state,team,pos):roster(team).filter(p=>p.pos===pos).sort((a,b)=>b.rating-a.rating)).filter(p=>!(Number(p.injury)>0)).slice(0,n);
 const scoreTeam=(team)=>{ if(window.GMFranchise){const x=GMFranchise.score(state,team);return {off:x.offense,def:x.defense,spec:x.special};}
  const unit=(positions)=>avg(positions.flatMap(([pos,n])=>depth(team,pos,n).map(p=>p.rating*(1-(p.fatigue||0)*.003)+((p.morale??65)-65)*.06)));
  const off=unit([['QB',1],['RB',1],['WR',3],['TE',1],['OL',5]]);
@@ -155,7 +155,7 @@ function endSeasonV2(){
   p.rating=clamp(p.rating+(p.age<27?rand(0,2):p.age>31?rand(-3,0):rand(-1,1)),45,p.pot);
   p.stats={yards:0,td:0,tackles:0,sacks:0};
  }
- state.year++;state.week=1;state.results=[];state.cash+=35;
+ state.year++;state.week=1;state.results=[];state.cash+=35;state.deadCap=0;
  state.engine.season=state.year;state.engine.schedule=freshSchedule();
  state.news.unshift(TEAMS[champ][1]+' won the '+(state.year-1)+' championship!');
  save();render();
