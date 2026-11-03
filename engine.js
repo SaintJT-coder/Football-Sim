@@ -141,7 +141,8 @@ function simulateV2(){
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
  if(!games.length){window.Gridiron?.emit('week:bye',{state,year:state.year,week:state.week});window.GMWeeklyGameplan?.finishWeek(state,devBefore);window.GMOwner?.weekly(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
- for(const g of games){const result=game({...g});state.results.push(result);window.GMSimPresentation?.report(state,result)}
+ for(const g of games){const beforeGame=window.GMLeagueNarratives?.snap(state,g);const result=game({...g});state.results.push(result);window.GMSimPresentation?.report(state,result);window.GMLeagueNarratives?.afterGame(state,result,beforeGame)}
+ window.GMLeagueNarratives?.weekly(state);
  window.Gridiron?.emit('week:games-complete',{state,year:state.year,week:state.week,games:state.results.filter(g=>g.year===state.year&&g.week===state.week)});
  window.GMDevelopment?.weekly(state,devBefore);
  window.GMWeeklyGameplan?.finishWeek(state,devBefore);
@@ -193,8 +194,11 @@ function endSeasonV2(){
  const runner=final.a===champ?final.b:final.a;
  state.history.push({year:state.year,champ:TEAMS[champ][1],runner:TEAMS[runner??standings[1].i][1]});
  state.champions.push(champ);
- const mvp=[...state.players].filter(p=>p.pos==='QB').sort((a,b)=>(b.stats.passYards+b.stats.passTD*20-b.stats.interceptions*35)-(a.stats.passYards+a.stats.passTD*20-a.stats.interceptions*35))[0];
- state.awards.push({year:state.year,mvp:mvp?.name||'—'});
+ const legacyMVP=[...state.players].filter(p=>p.pos==='QB').sort((a,b)=>(b.stats.passYards+b.stats.passTD*20-b.stats.interceptions*35)-(a.stats.passYards+a.stats.passTD*20-a.stats.interceptions*35))[0];
+ const leagueHonors=window.GMLeagueNarratives?.seasonEnd(state);
+ state.awards.push({year:state.year,mvp:leagueHonors?.mvp?.name||legacyMVP?.name||'—',
+  offense:leagueHonors?.offense?.name||'—',defense:leagueHonors?.defense?.name||'—',
+  rookie:leagueHonors?.rookie?.name||'—'});
  window.GMOwner?.seasonEnd(state,{champion:champ===state.team,playoffs:playoffs.some(g=>g.a===state.team||g.b===state.team),division:seeded.some(c=>c[0]?.i===state.team)});
  window.GMStaff?.seasonEnd(state);
  window.GMSeasonRecap?.generate(state,standings,playoffs,state.awards);
