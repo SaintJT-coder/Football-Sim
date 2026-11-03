@@ -3,10 +3,10 @@
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const avg=(xs)=>xs.length?xs.reduce((s,n)=>s+n,0)/xs.length:0;
 const pick=(xs)=>xs[Math.floor(Math.random()*xs.length)];
-const depth=(team,pos,n=1)=>roster(team).filter(p=>p.pos===pos&&p.injury<=0).sort((a,b)=>b.rating-a.rating).slice(0,n);
+const depth=(team,pos,n=1)=>roster(team).filter(p=>p.pos===pos&&!(Number(p.injury)>0)).sort((a,b)=>b.rating-a.rating).slice(0,n);
 const scoreTeam=(team)=>{
  const unit=(positions)=>avg(positions.flatMap(([pos,n])=>depth(team,pos,n).map(p=>p.rating*(1-(p.fatigue||0)*.003)+((p.morale??65)-65)*.06)));
- const off=unit([['QB',1],['RB',1],['WR',3],['TE',1],['OL',4]]);
+ const off=unit([['QB',1],['RB',1],['WR',3],['TE',1],['OL',5]]);
  const def=unit([['DL',3],['LB',3],['CB',2],['S',2]]);
  const spec=unit([['K',1]]);
  return {off:off||58,def:def||58,spec:spec||60};
@@ -71,14 +71,14 @@ function game(g){
   distribute(receivers,passYards,'receivingYards',p=>Math.max(1,p.rating-48)*(p.pos==='WR'?1.2:.8));
   distribute(receivers,Math.round(passYards/12),'receptions',p=>Math.max(1,p.rating-48));
   distribute(rbs,Math.max(0,tds-Math.round(tds*passShare)),'rushTD',p=>Math.max(1,p.rating-48));
-  for(const p of [...rbs,...receivers]){let yards=(p.stats.rushYards||0)+(p.stats.receivingYards||0);p.stats.yards=yards;p.stats.td=(p.stats.rushTD||0)+(p.stats.recTD||0)}
+  for(const p of [...rbs,...receivers]){p.stats.yards=(p.stats.rushYards||0)+(p.stats.receivingYards||0);p.stats.td=(p.stats.rushTD||0)+(p.stats.recTD||0)}
   const defense=roster(team).filter(p=>['DL','LB','CB','S'].includes(p.pos)&&!p.injury);
   distribute(defense,clamp(Math.round(50+noise(14)),35,75),'tackles',p=>p.rating);
   distribute(defense.filter(p=>['DL','LB'].includes(p.pos)),clamp(Math.round((35-againstPts)/12+noise(2)),0,5),'sacks',p=>p.rating);
   for(const p of roster(team)){
    p.stats.games++;p.fatigue=clamp((p.fatigue||0)+rand(5,14),0,100);
    const injuryRisk=.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0);
-   if(p.injury>0){p.injury--;continue}
+   if(Number(p.injury)>0){p.injury--;continue}
    if(Math.random()<injuryRisk){p.injury=rand(1,5);state.news.unshift(p.name+' suffered an injury ('+p.injury+' weeks)')}
    p.morale=clamp(p.morale+(forPts>againstPts?rand(0,3):-rand(0,3)),15,100);
    p.development+=Math.max(0,(p.pot-p.rating))*Math.max(.05,(31-p.age)/100);
