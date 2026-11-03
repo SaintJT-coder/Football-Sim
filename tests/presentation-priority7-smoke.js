@@ -56,7 +56,9 @@ assert.equal(conference.result,'W');
 assert.equal(conference.questions.length,3);
 assert.match(P.pressPage(state),/THE PRESS ROOM/);
 const beforeFan=state.ownerFranchise.fanHappiness;
-const beforeMorale=players[0].morale;
+const leader=players.filter(p=>p.team===0&&p.pos==='QB')
+  .sort((a,b)=>b.rating-a.rating)[0];
+const beforeMorale=leader.morale;
 const first=conference.questions[0];
 assert.equal(P.respond(state,first.id,first.options[0].id).ok,true);
 assert.equal(P.respond(state,first.id,first.options[0].id).ok,false,
@@ -67,7 +69,7 @@ assert.equal(state.immersionPress.history.length,1);
 assert.equal(state.immersionPress.active,null);
 assert.equal(state.expansion.press,1);
 assert.equal(state.ownerFranchise.fanHappiness>beforeFan,true);
-assert.equal(players[0].morale>beforeMorale,true);
+assert.equal(leader.morale>beforeMorale,true);
 assert.strictEqual(P.afterWeek(state),conference,
   'Completing conference must not create another one in the same week');
 assert.equal(P.respond(state,'RESULT','confidence').ok,false);
