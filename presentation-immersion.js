@@ -81,6 +81,13 @@ function openConference(s,week=s.week){
  const complete=d.history.find(h=>h.key===key);
  if(complete)return complete;
  if(d.processed.includes(key))return null;
+ // Preserve an unanswered older session as MISSED when the next week is simulated.
+ if(d.active&&!d.active.completed&&d.active.key!==key){
+   d.active.skipped=true;
+   d.history.unshift(d.active);
+   d.history.length=Math.min(d.history.length,CONFIG.press.archive);
+   d.active=null;
+ }
  const game=teamGame(s,week);
  const meeting={key,year:s.year,week,opponent:game?(game.a===s.team?game.b:game.a):null,
    result:game?((game.sa>game.sb?game.a:game.b)===s.team?'W':'L'):'BYE',
@@ -149,7 +156,7 @@ function pressPage(s){
    '<h1>THE PRESS ROOM</h1><p>Every answer matters. Shape supporters’ confidence, media pressure and locker-room morale.</p></div>'+
    summary+active+'<h2 class="gm-p7-heading">CONFERENCE ARCHIVE</h2>'+
    (d.history.slice(0,8).map(m=>'<div class="gm-p7-archive"><b>'+m.year+' • WEEK '+m.week+
-     ' • '+escape(m.result)+'</b>'+m.answers.map(a=>'<p>“'+escape(a.statement)+'”</p>').join('')+
+     ' • '+escape(m.result)+(m.skipped?' • MISSED':'')+'</b>'+m.answers.map(a=>'<p>“'+escape(a.statement)+'”</p>').join('')+
      '</div>').join('')||'<div class="card">No press conferences completed yet.</div>')+
    '</section>';
 }
