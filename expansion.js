@@ -1,5 +1,5 @@
 /* Gridiron GM expansion: screenshot-inspired franchise systems. */
-const extraPages=['Achievements','Staff & Owner','Re-sign & Tags','Playoff Picture','League Leaders','Depth Chart','Injury Report','Training','News & Rankings','Social Media','Playbook Studio'];
+const extraPages=['Achievements','Staff & Owner','Re-sign & Tags','Playoff Picture','League Leaders','Depth Chart','Injury Report','Training','News & Rankings','Social Media','Playbook Studio','Relocation & Stadium'];
 const extraStore=()=>{state.expansion??={achievements:[],staff:{OC:{name:'Dominic Fotu',rating:70},DC:{name:'Shamar Gaines',rating:69},Scout:{name:'Knox Bennett',rating:60},Trainer:{name:'Quinton Moss',rating:68}},jobSecurity:60,trainingPoints:12,contracts:{},scheme:'Zone Run',defense:'Cover 2',captains:[],press:0};return state.expansion};
 const xp=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function achievementUnlock(key){let e=extraStore();if(!e.achievements.includes(key)){e.achievements.push(key);save()}}
@@ -27,7 +27,7 @@ function addPlay(){let name=prompt('Play name');if(!name?.trim())return;let type
 const oldNav=nav,oldRender=render,oldSimulate=simulate;
 nav=function(){oldNav();$('nav').innerHTML+=extraPages.map((p,i)=>'<button class="nav '+(page===p?'active':'')+'" onclick="goExtra('+i+')">✦ &nbsp; '+p+'</button>').join('')};
 function goExtra(i){page=extraPages[i];render();window.scrollTo(0,0);if(innerWidth<851)$('sidebar').style.display='none'}
-render=function(){extraStore();if(extraPages.includes(page)){nav();$('mobileSeason').textContent=state.year+' W'+state.week;$('app').innerHTML=[achievementsPage,staffPage,resignPage,playoffPage,leadersPage,depthPage,injuryPage,trainingPage,newsPage,socialPage,playbookPage][extraPages.indexOf(page)]();return}oldRender()};
+render=function(){extraStore();if(extraPages.includes(page)){nav();$('mobileSeason').textContent=state.year+' W'+state.week;$('app').innerHTML=[achievementsPage,staffPage,resignPage,playoffPage,leadersPage,depthPage,injuryPage,trainingPage,newsPage,socialPage,playbookPage,()=>window.GMRelocation?GMRelocation.page(state):'<div class="card">Stadium operations unavailable.</div>'][extraPages.indexOf(page)]();return}oldRender()};
 simulate=function(){oldSimulate();let e=extraStore();e.trainingPoints=Math.min(30,e.trainingPoints+(e.plan==='Development'?5:e.plan==='Recovery'?2:3));e.jobSecurity=Math.max(0,Math.min(100,e.jobSecurity+(record(state.team).w>record(state.team).l?1:-1)));save()};
 
 // Refresh navigation after expansion loads so new sections appear immediately.
