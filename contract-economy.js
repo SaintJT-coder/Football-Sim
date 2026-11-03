@@ -358,7 +358,13 @@ function registerSigning(p,s,offer={}){
    noTag:offer.clause==='NO_TAG'||!!offer.noTag};
  c.options=[];c.voidYears=0;c.voidProration=[];c.incentiveLadders=[];
  if(['TEAM_OPTION','PLAYER_OPTION'].includes(offer.clause)){
-   const holder=offer.clause==='TEAM_OPTION'?'TEAM':'PLAYER',year=s.year+years-1;
+   // Free-agency option clauses attach one EXTRA conditional year after the base deal.
+   // The extra year has no guaranteed salary, and its exercise is decided the prior season.
+   const holder=offer.clause==='TEAM_OPTION'?'TEAM':'PLAYER',year=s.year+years;
+   c.baseSalaries.push(money(p.salary));
+   c.bonusProration.push(0);
+   c.guarantees.push(0);
+   p.years=years+1;
    c.options.push({year,holder,salary:p.salary,decided:false,exercised:null,
      deadlineYear:year-1,deadlineWeek:CONFIG.option.decisionDeadlineWeek});
  }
