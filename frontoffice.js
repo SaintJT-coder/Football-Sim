@@ -59,8 +59,10 @@ function propose(){let f=init(),other=state.selectedTrade;if(window.GMWeeklyGame
  const assess=tradeAssessment();if(!assess.accepted){f.counter={needed:Math.ceil(assess.expected-assess.ours-assess.otherNeeds)};save();render();return}
  const outgoing=f.selectedOut.filter(x=>x.kind==='player').map(x=>state.players.find(p=>p.id===x.id)),incoming=f.selectedIn.filter(x=>x.kind==='player').map(x=>state.players.find(p=>p.id===x.id));
  if(window.GMContractEconomy){const blocked=[...outgoing,...incoming].find(p=>!GMContractEconomy.canTrade(p));if(blocked)return notice('Trade prohibited: '+blocked.name+' has a no-trade clause.');}
- const myNewCap=capspace()+outgoing.reduce((s,p)=>s+p.salary,0)-incoming.reduce((s,p)=>s+p.salary,0);
- const otherNewCap=state.cap-payroll(other)+incoming.reduce((s,p)=>s+p.salary,0)-outgoing.reduce((s,p)=>s+p.salary,0);
+ const charge=p=>window.GMContractsAdvanced?.capHit(p,state.year,state)??(p.salary||0);
+ const myNewCap=capspace()+outgoing.reduce((sum,p)=>sum+charge(p),0)-incoming.reduce((sum,p)=>sum+charge(p),0);
+ const otherOldSpace=window.GMContractEconomy?.sheet(state,other).space??state.cap-payroll(other);
+ const otherNewCap=otherOldSpace+incoming.reduce((sum,p)=>sum+charge(p),0)-outgoing.reduce((sum,p)=>sum+charge(p),0);
  if(myNewCap<0||otherNewCap<0)return notice('Trade rejected: salary cap violation');
  for(let x of f.selectedOut){if(x.kind==='player')state.players.find(p=>p.id===x.id).team=other;else f.picks.find(p=>p.id===x.id).owner=other}
  for(let x of f.selectedIn){if(x.kind==='player')state.players.find(p=>p.id===x.id).team=state.team;else f.picks.find(p=>p.id===x.id).owner=state.team}
