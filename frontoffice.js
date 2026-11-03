@@ -5,12 +5,13 @@ const allPos=['QB','RB','WR','TE','OL','DL','LB','CB','S','K'];
 const need=(team,pos)=>{let r=roster(team).filter(p=>p.pos===pos).sort((a,b)=>b.rating-a.rating);const desired={QB:2,RB:3,WR:5,TE:3,OL:5,DL:4,LB:4,CB:4,S:3,K:1}[pos];return c((desired-r.length)*5+Math.max(0,78-(r[0]?.rating||55))*.5,-8,30)};
 const talent=(p)=>p.rating*1.35+(p.pot-p.rating)*.8+(29-p.age)*.7+(p.years||1)*1.2;
 const playerValue=(p,team)=>Math.max(3,talent(p)-55+need(team,p.pos)*.6-(p.salary||0)*.55-(p.injury||0)*2);
-const pickValue=(p)=>Math.round(160*Math.pow(.69,p.round-1)*(1.18-(p.slot-1)/Math.max(1,TEAMS.length)*.36));
+const pickValue=(p)=>window.GMDraftRealism?.pickValue(p.round,p.slot,state)??Math.round(160*Math.pow(.69,p.round-1)*(1.18-(p.slot-1)/Math.max(1,TEAMS.length)*.36));
 function init(){
  state.frontOffice??={season:state.year,prospects:[],picks:[],scouted:{},draftLog:[],tradeLog:[],offers:[],selectedOut:[],selectedIn:[],counter:null,round:1,clock:0,boardFilter:'ALL',tradeTab:'Players',draftStarted:false};
  const f=state.frontOffice;
  if(f.season!==state.year){f.season=state.year;f.prospects=[];f.picks=[];f.scouted={};f.draftLog=[];f.offers=[];f.selectedOut=[];f.selectedIn=[];f.round=1;f.clock=0;f.draftStarted=false}
  if(!f.picks.length&&!f.draftStarted){for(let round=1;round<=7;round++)for(let slot=1;slot<=TEAMS.length;slot++)f.picks.push({id:state.year+'-'+round+'-'+slot,round,slot,owner:slot-1,original:slot-1,used:false})}
+ if(window.GMDraftRealism&&!f.draftStarted)window.GMDraftRealism.generate(state,f.prospects);
  if(!f.prospects.length&&!f.draftStarted){
   let first=['Mason','Jalen','Eli','Tyrese','Andre','Malik','Carter','Devin','Noah','Darius','Cole','Bryce','Landon','Kendrick','Jordan','Micah','Dante','Trey'],last=['Holloway','Mercer','Bennett','Sullivan','Bishop','Jefferson','Coleman','Porter','Rivers','Hayes','McCall','Griffin','Walker','Fields','Brooks','King'];
   for(let i=0;i<130;i++){let pos=allPos[i%10],trueRating=rand(56,83),potential=c(trueRating+rand(3,17),60,99),id='rookie-'+state.year+'-'+i;f.prospects.push({id,name:first[rand(0,first.length-1)]+' '+last[rand(0,last.length-1)],pos,age:rand(20,23),rating:trueRating,pot:potential,athletic:rand(55,99),medical:rand(50,100),character:rand(50,100),dev:potential-trueRating>12?'Elite':potential-trueRating>7?'Star':'Normal',projection:Math.round(trueRating+rand(-13,13)),tier:c(Math.ceil((88-trueRating)/6),1,6)})}
@@ -19,23 +20,27 @@ function init(){
 }
 const available=()=>init().picks.filter(p=>!p.used).sort((a,b)=>a.round-b.round||a.slot-b.slot);
 const currentPick=()=>available()[0];
-function scout(id){let f=init(),p=f.prospects.find(x=>x.id===id);if(!p)return;let s=f.scouted[id]||0;if(s>=3)return;let budget=state.upgrades.scoutPoints??20;if(budget<3)return notice('Need 3 scouting points');state.upgrades.scoutPoints=budget-3;f.scouted[id]=s+1;save();render()}
-function grade(p){let s=init().scouted[p.id]||0;return s===0?'?':s===1?Math.round(p.rating/5)*5+' ± 8':s===2?p.rating+' ± 4':p.rating+' OVR'}
+function scout(id){let f=init(),p=f.prospects.find(x=>x.id===id);if(!p)return;let s=f.scouted[id]||0;if(s>=3)return;let budget=state.upgrades.scoutPoints??20;if(budget<3)return notice('Need 3 scouting points');state.upgrades.scoutPoints=budget-3;f.scouted[id]=s+1;window.GMDraftRealism?.scout(p,state);save();render()}
+function grade(p){const g=window.GMDraftRealism?.publicGrade(p,state);if(g)return g.overall+' ± '+g.margin+' ('+g.confidence+'% confidence)';let s=init().scouted[p.id]||0;return s===0?'?':s===1?Math.round(p.rating/5)*5+' ± 8':s===2?p.rating+' ± 4':p.rating+' OVR'}
 function prospectRows(list,action=true){return list.map(p=>'<div class="card" style="margin:8px 0"><div class="row" style="gap:12px;flex-wrap:wrap"><div><b>'+xp(p.name)+'</b> <span class="pill">'+p.pos+'</span><p class="muted small">Age '+p.age+' · Grade '+grade(p)+' · Projected '+p.projection+' · Athletic '+p.athletic+' · Scout '+(init().scouted[p.id]||0)+'/3</p></div><div><button onclick="scoutProspect(\''+p.id+'\')">Scout</button> '+(action?'<button class="primary" onclick="draftProspect(\''+p.id+'\')">Draft</button>':'')+'</div></div></div>').join('')}
-function aiDraft(pick){const f=init(),pool=f.prospects.filter(p=>!p.drafted);if(!pool.length)return;pool.sort((a,b)=>(b.rating+b.pot*.2+need(pick.owner,b.pos)*.45)-(a.rating+a.pot*.2+need(pick.owner,a.pos)*.45));selectProspect(pool[0],pick)}
+function aiDraft(pick){const f=init(),pool=f.prospects.filter(p=>!p.drafted);if(!pool.length)return;pool.sort((a,b)=>(window.GMDraftRealism?.draftValue(b,pick.owner,state)??(b.rating+b.pot*.2+need(pick.owner,b.pos)*.45))-(window.GMDraftRealism?.draftValue(a,pick.owner,state)??(a.rating+a.pot*.2+need(pick.owner,a.pos)*.45)));selectProspect(pool[0],pick)}
 function selectProspect(p,pick){const f=init();if(!p||p.drafted||!pick||pick.used)return false;
- p.drafted=true;pick.used=true;
+ p.drafted=true;pick.used=true;f.draftStarted=true;
  const newId=Math.max(0,...state.players.map(x=>Number(x.id)||0))+1;
  const salary=+(Math.max(.7,5.2-pick.round*.57-pick.slot*.035)).toFixed(2);
  state.players.push({id:newId,name:p.name,pos:p.pos,age:p.age,rating:p.rating,pot:p.pot,salary,team:pick.owner,stats:{yards:0,td:0,tackles:0,sacks:0},injury:0,years:4,target:false,fatigue:0,morale:70,development:0,rookie:true,devTrait:p.dev});
- f.draftLog.push({pick:pick.id,team:pick.owner,player:p.name,prospectId:p.id,pos:p.pos,overall:p.rating,round:pick.round});
+ const rookie=state.players[state.players.length-1];
+ if(p.draftRealism?.trueAttributes)rookie.attributes={...p.draftRealism.trueAttributes};
+ if(window.GMDraftRealism)GMDraftRealism.rookieContract(rookie,state,pick.round,pick.slot);
+ else window.GMDraftAdvanced?.draft(rookie,state,pick.round,pick.slot);
+ f.draftLog.push({pick:pick.id,team:pick.owner,player:p.name,prospectId:p.id,pos:p.pos,overall:p.rating,round:pick.round,slot:pick.slot});
  state.news.unshift('Draft: '+TEAMS[pick.owner][1]+' selected '+p.name+' ('+p.pos+')');
  save();return true}
 function draftProspect(id){const f=init(),pick=currentPick();if(!pick)return notice('Draft complete');if(pick.owner!==state.team)return notice('AI team is on the clock. Advance to your pick.');let p=f.prospects.find(x=>x.id===id);if(!p||p.drafted)return;selectProspect(p,pick);render()}
-function advanceDraft(){let f=init(),pick=currentPick();if(!pick)return notice('Draft complete');let count=0;while((pick=currentPick())&&pick.owner!==state.team&&count<84){aiDraft(pick);count++}save();render()}
-function autoDraft(){let f=init(),count=0;while(currentPick()&&count<84){aiDraft(currentPick());count++}save();render()}
-function draftPage(){let f=init(),pick=currentPick(),left=f.prospects.filter(p=>!p.drafted),mine=f.picks.filter(p=>p.owner===state.team&&!p.used);return title('NFL-Style Rookie Draft','Seven rounds · 12 fictional clubs · 84 picks · player development traits','DRAFT WAR ROOM')
- +'<div class="grid three">'+metric('On the clock',pick?TEAMS[pick.owner][0]:'Draft complete')+metric('Overall pick',pick?(pick.round-1)*12+pick.slot:'—')+metric('My remaining picks',mine.length)+metric('Scouting points',state.upgrades.scoutPoints??20)+metric('Prospects available',left.length)+metric('Round',pick?.round||7)+'</div>'
+function advanceDraft(){let f=init(),pick=currentPick();if(!pick)return notice('Draft complete');let count=0;while((pick=currentPick())&&pick.owner!==state.team&&count<f.picks.length){aiDraft(pick);count++}save();render()}
+function autoDraft(){let f=init(),count=0;while(currentPick()&&count<f.picks.length){aiDraft(currentPick());count++}save();render()}
+function draftPage(){let f=init(),pick=currentPick(),left=f.prospects.filter(p=>!p.drafted),mine=f.picks.filter(p=>p.owner===state.team&&!p.used);return title('NFL-Style Rookie Draft','Seven rounds · '+TEAMS.length+' fictional clubs · '+f.picks.length+' picks · hidden prospect ratings','DRAFT WAR ROOM')
+ +'<div class="grid three">'+metric('On the clock',pick?TEAMS[pick.owner][0]:'Draft complete')+metric('Overall pick',pick?(pick.round-1)*TEAMS.length+pick.slot:'—')+metric('My remaining picks',mine.length)+metric('Scouting points',state.upgrades.scoutPoints??20)+metric('Prospects available',left.length)+metric('Round',pick?.round||7)+'</div>'
  +'<div class="card" style="margin:16px 0"><h3>Draft controls</h3><button class="primary" onclick="advanceDraft()">Advance to My Pick</button> <button onclick="autoDraft()" >Simulate Remaining Draft</button><p class="muted small">Drafting commits a four-year rookie contract. Scouting reveals ratings in stages. AI selects by talent and roster needs.</p></div>'
  +'<div class="filters">'+['ALL',...allPos].map(pos=>'<button class="'+(f.boardFilter===pos?'selected':'')+'" onclick="state.frontOffice.boardFilter=\''+pos+'\';render()">'+pos+'</button>').join('')+'</div>'
  +heading('PROSPECT BOARD')+prospectRows(left.filter(p=>f.boardFilter==='ALL'||p.pos===f.boardFilter).sort((a,b)=>b.projection-a.projection).slice(0,45))
