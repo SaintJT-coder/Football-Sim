@@ -18,7 +18,23 @@ function depthPage(){
 }
 window.gmMoveDepth=(pos,i,d)=>{let ids=GMFranchise.depth(state,state.team,pos).map(p=>p.id),j=i+d;if(j<0||j>=ids.length)return;[ids[i],ids[j]]=[ids[j],ids[i]];GMFranchise.setDepth(state,state.team,pos,ids);save();render()};
 window.gmSetScheme=(side,value)=>{init();if(!(side==='offense'?GMFranchise.OFF:GMFranchise.DEF).includes(value))return;state.franchiseSystems.schemes[state.team]??={};state.franchiseSystems.schemes[state.team][side]=value;save();render()};
-function staffPage(){init();return title('Coaching Staff','Manage your coaching staff and see how coordinators influence game performance.','FRONT OFFICE')+'<div class="grid two">'+Object.entries(state.staff).map(([role,p])=>'<div class="card"><h3>'+esc(role.replace(/([A-Z])/g,' $1'))+'</h3><p>'+esc(p.name)+'</p><p>Rating: '+p.rating+'/99</p><p class="muted small">Coordinator ratings affect offensive and defensive performance.</p></div>').join('')+'</div>'}
+function staffPage(){
+ init();const labels={headCoach:'Head Coach',offensiveCoordinator:'Offensive Coordinator',defensiveCoordinator:'Defensive Coordinator',headScout:'Head Scout',strengthCoach:'Strength Coach'};
+ const money=state.staffBudget??18;
+ return title('Coaching Staff','Hire staff, manage your budget and build a coaching tree. Coordinator ratings affect games.','FRONT OFFICE')
+ +'<div class="grid three">'+metric('Available cash','$'+Number(state.cash).toFixed(1)+'M')+metric('Annual staff budget','$'+money.toFixed(1)+'M')+metric('Job security',(state.engineExtra?.jobSecurity??state.coach??75)+'/100')+'</div>'
+ +'<div class="grid two">'+Object.entries(labels).map(([role,label])=>{const p=state.staff[role],salary=p.salary??+(p.rating*.032).toFixed(1);return '<div class="card"><h3>'+label+'</h3><b>'+esc(p.name)+'</b><p>Rating '+p.rating+'/99 · Salary $'+salary.toFixed(1)+'M</p><p class="muted small">'+(role==='offensiveCoordinator'?'Improves offensive efficiency':role==='defensiveCoordinator'?'Improves defensive efficiency':role==='headScout'?'Supports scouting and prospect evaluations':role==='strengthCoach'?'Improves recovery and conditioning':'Sets coaching culture and owner confidence')+'</p><button onclick="gmHireStaff(\''+role+'\')">Interview replacement</button></div>'}).join('')+'</div>';
+}
+window.gmHireStaff=role=>{
+ init();if(!Object.hasOwn(state.staff,role))return;
+ const current=state.staff[role],rating=clamp(Math.round(65+Math.random()*28),55,99),salary=+(rating*.032).toFixed(1),name=['Avery Brooks','Jordan Price','Morgan Carter','Taylor Ellis','Cameron Reed','Devin Hayes'][Math.floor(Math.random()*6)];
+ const cost=+(salary*2).toFixed(1);
+ if(state.cash<cost)return notice('Not enough cash to hire this coach. Signing cost: $'+cost.toFixed(1)+'M');
+ if(!confirm('Hire '+name+' ('+rating+' OVR) as '+role.replace(/([A-Z])/g,' $1')+' for $'+salary+'M/year? $'+cost.toFixed(1)+'M due now.'))return;
+ state.cash=+(state.cash-cost).toFixed(2);
+ state.staffHistory??=[];state.staffHistory.unshift({year:state.year,role,previous:current.name,replacement:name,rating,salary});
+ state.staff[role]={name,rating,salary,years:2};state.news.unshift(name+' hired as '+role.replace(/([A-Z])/g,' $1'));save();render();
+};
 function combine(p){
  init();let cache=state.draftPolish.combine;if(cache[p.id])return cache[p.id];
  const athletic=clamp(Number(p.athletic)||p.rating||65,35,99),n=(a,b)=>a+Math.random()*(b-a);
