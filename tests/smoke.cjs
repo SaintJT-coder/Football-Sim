@@ -6,6 +6,16 @@ const {chromium}=require('playwright');
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto('file://'+process.cwd()+'/index.html',{waitUntil:'load'});
  await page.waitForTimeout(800);
+ const menuVisible=await page.locator('#gm-menu').count();
+ if(menuVisible!==1)throw Error('Main menu failed to initialize');
+ await page.locator('[data-action="main"]').first().click();
+ const continueVisible=await page.locator('#gm-menu [data-action="continue"]').count();
+ if(continueVisible!==1)throw Error('Legacy save migration did not preserve active franchise');
+ await page.locator('#gm-menu [data-action="load"]').click();
+ if(await page.locator('#gm-menu [data-load="0"]').count()!==1)throw Error('Legacy save not migrated to slot 1');
+ await page.locator('#gm-menu [data-action="main"]').click();
+ await page.locator('#gm-menu [data-action="continue"]').click();
+ if(await page.locator('#gm-menu').count())throw Error('Continue did not enter game');
  const boot=await page.evaluate(()=>({year:state.year,week:state.week,nav:pages.slice(),players:state.players.length}));
  if(boot.players<100)throw Error('Players not initialized');
  for(const tab of ['Dashboard','Roster','Depth Chart','Combine','Coaching Staff','Salary Cap','Schedule','Weekly Report','Draft Board','Player Market','Trade Center','Animation']){
