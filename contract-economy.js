@@ -268,9 +268,11 @@ function assessLadders(p,s,ctx){
    });
    x.settled=true;x.met=met;
    if(met){
-     x.paidYear=s.year;s.cash=money(s.cash-x.payout);
+     x.paidYear=s.year;
+     // CPU team bonuses must not reduce the user's cash.
+     if(p.team===s.team)s.cash=money(s.cash-x.payout);
      p.morale=clamp((p.morale??65)+3,0,100);
-     s.news?.unshift(p.name+' earned a $'+money(x.payout)+'M performance incentive.');
+     if(p.team===s.team)s.news?.unshift(p.name+' earned a $'+money(x.payout)+'M performance incentive.');
    }
    settled.push({id:x.id,playerId:p.id,met,year:s.year,payout:met?x.payout:0});
  }
