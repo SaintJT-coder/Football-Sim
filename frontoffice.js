@@ -52,9 +52,10 @@ function toggleAsset(side,kind,id){let f=init(),list=side==='out'?f.selectedOut:
 function tradeValue(items,recipient){return items.reduce((sum,x)=>sum+value(x,recipient),0)}
 function tradeAssessment(){let f=init(),other=state.selectedTrade;let ours=tradeValue(f.selectedOut,other),theirs=tradeValue(f.selectedIn,state.team);
  const otherNeeds=f.selectedOut.filter(x=>x.kind==='player').reduce((s,x)=>s+need(other,state.players.find(p=>String(p.id)===String(x.id))?.pos||'QB')*.5,0);
- const expected=theirs*(1.07+Math.max(0,record(other).l-record(other).w)*.008);
+ const market=window.GMWeeklyGameplan?.tradeTerms(state,other);
+ const expected=theirs*(1.07+Math.max(0,record(other).l-record(other).w)*.008)*(market?.multiplier||1);
  return {ours,theirs,expected,otherNeeds,accepted:ours+otherNeeds>=expected}}
-function propose(){let f=init(),other=state.selectedTrade;if(state.week>12)return notice('Trade deadline has passed');if(!f.selectedOut.length||!f.selectedIn.length)return notice('Select assets from both teams');
+function propose(){let f=init(),other=state.selectedTrade;if(window.GMWeeklyGameplan?.tradeTerms(state,other).open===false||(!window.GMWeeklyGameplan&&state.week>12))return notice('Trade deadline has passed');if(!f.selectedOut.length||!f.selectedIn.length)return notice('Select assets from both teams');
  const assess=tradeAssessment();if(!assess.accepted){f.counter={needed:Math.ceil(assess.expected-assess.ours-assess.otherNeeds)};save();render();return}
  const outgoing=f.selectedOut.filter(x=>x.kind==='player').map(x=>state.players.find(p=>p.id===x.id)),incoming=f.selectedIn.filter(x=>x.kind==='player').map(x=>state.players.find(p=>p.id===x.id));
  const myNewCap=capspace()+outgoing.reduce((s,p)=>s+p.salary,0)-incoming.reduce((s,p)=>s+p.salary,0);
@@ -69,7 +70,8 @@ function tradePage(){let f=init(),other=state.selectedTrade===state.team?(state.
  const side=(team,selected,which)=>'<div class="card"><h3>'+TEAMS[team][1]+'</h3><p class="muted">Select players and draft picks (up to six)</p><div style="max-height:520px;overflow:auto">'+tradeItems(team).map(x=>{let chosen=selected.some(y=>itemKey(y)===itemKey(x));return '<div class="row" style="padding:7px 0;border-bottom:1px solid #29303c;gap:8px"><span class="small">'+xp(x.name)+' <b>Value '+x.val+'</b></span><button class="'+(chosen?'primary':'')+'" onclick="toggleTradeAsset(\''+which+'\',\''+x.kind+'\',\''+x.id+'\')">'+(chosen?'✓':'Add')+'</button></div>'}).join('')+'</div></div>';
  return title('Trade Negotiation Center','Player-for-player, draft pick packages, roster needs, AI evaluation and salary-cap compliance.','GENERAL MANAGER')
  +'<div class="filters">'+TEAMS.map((t,i)=>i===state.team?'':'<button class="'+(other===i?'selected':'')+'" onclick="state.selectedTrade='+i+';state.frontOffice.selectedOut=[];state.frontOffice.selectedIn=[];render()">'+t[0]+'</button>').join('')+'</div>'
- +(state.week>12?'<div class="card">Trade deadline has passed for this season.</div>':'')
+ +(state.week>(window.GMWeeklyGameplan?.CONFIG.deadlineWeek??12)?'<div class="card">Trade deadline has passed for this season.</div>':'')
+ +(window.GMWeeklyGameplan?'<div class="card"><h3>TRADE DEADLINE · WEEK '+GMWeeklyGameplan.CONFIG.deadlineWeek+'</h3><p>'+GMWeeklyGameplan.tradeTerms(state,other).status+' · AI demand ×'+GMWeeklyGameplan.tradeTerms(state,other).multiplier.toFixed(2)+'</p><p class="muted">Rebuilding teams may be willing sellers; playoff contenders demand stronger packages. This changes real negotiation thresholds.</p></div>':'')
  +'<div class="grid two">'+side(state.team,f.selectedOut,'out')+side(other,f.selectedIn,'in')+'</div>'
  +'<div class="card" style="margin-top:14px"><h3>Trade evaluation</h3><div class="grid three">'+metric('You send',Math.round(assess.ours)) +metric('You receive',Math.round(assess.theirs))+metric('AI target',Math.round(assess.expected))+'</div><p class="muted">AI factors in talent, age, potential, contracts, positional needs and pick value. Final approval is never guaranteed until cap validation.</p>'
  +(f.counter?'<p class="notice">Counteroffer: Add approximately '+f.counter.needed+' value to your package.</p>':'')
