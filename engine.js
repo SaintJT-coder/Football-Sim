@@ -116,6 +116,7 @@ function game(g){
 function simulateV2(){
  setup();
  if(state.week>18){endSeasonV2();return}
+ if(window.GMRosterRules){const check=GMRosterRules.validate(state,state.team);if(!check.ok){alert(check.issues.join(', '));return}}
  const games=state.engine.schedule.filter(g=>g.week===state.week);
  window.GMContractsAdvanced?.weekly(state);
  window.GMCoaching?.weekly(state);
