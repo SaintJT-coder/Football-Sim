@@ -66,6 +66,9 @@ function game(g){
  a.off+=staffBonus(g.a,'offensiveCoordinator')+(g.a===state.team?(coach?.offSynergy||0)*.3:0);a.def+=staffBonus(g.a,'defensiveCoordinator')+(g.a===state.team?(coach?.defSynergy||0)*.3:0);
  b.off+=staffBonus(g.b,'offensiveCoordinator')+(g.b===state.team?(coach?.offSynergy||0)*.3:0);b.def+=staffBonus(g.b,'defensiveCoordinator')+(g.b===state.team?(coach?.defSynergy||0)*.3:0);
  const context=gameContext(g),weather=context.weather;
+ const rivalry=window.GMSimPresentation?.pregameBoost(state,g,g.a)||0;
+ const rivalryB=window.GMSimPresentation?.pregameBoost(state,g,g.b)||0;
+ a.off*=1+rivalry;b.off*=1+rivalryB;
  const weatherPenalty=weather==='Rain'?-1:weather==='Snow'?-3:weather==='Wind'?-2:weather==='Extreme Cold'?-2:0;
  const boost=t=>{const ps=roster(t).filter(p=>p.injury<=0).slice(0,12);return ps.length?ps.reduce((v,p)=>v+(window.GMDevelopment?.abilityBoost(p,{playType:'pass',scheme:window.GMFranchise?.scheme(state,t,'offense')})||0),0)/ps.length:0};
  a.off*=1+boost(g.a);b.off*=1+boost(g.b);
@@ -126,7 +129,7 @@ function simulateV2(){
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
  if(!games.length){window.GMOwner?.weekly(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
- for(const g of games){const result=game({...g});state.results.push(result)}
+ for(const g of games){const result=game({...g});state.results.push(result);window.GMSimPresentation?.report(state,result)}
  window.GMDevelopment?.weekly(state,devBefore);
  if(window.GMContractsAdvanced)for(const p of state.players.filter(x=>x.team>=0))GMContractsAdvanced.incentiveCheck(p,state,{teamWins:record(p.team).w});
  for(const p of state.players){
@@ -182,11 +185,12 @@ function endSeasonV2(){
  window.GMContractsAdvanced?.season(state,Object.fromEntries(TEAMS.map((_,i)=>[i,{teamWins:record(i).w,playoffs:playoffs.some(g=>g.a===i||g.b===i)}])));
  for(const p of state.players){
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
-  if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){state.retired.push({...p,retiredYear:state.year});p.team=-2}
+  if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){const retired={...p,retiredYear:state.year};state.retired.push(retired);window.GMSimPresentation?.retirement(state,retired);p.team=-2}
   else if(p.years<=0){p.team=-1;p.years=1}
   if(window.GMDevelopment)GMDevelopment.aging(p);else p.rating=clamp(p.rating+(p.age<27?rand(0,2):p.age>31?rand(-3,0):rand(-1,1)),45,p.pot);
   p.stats={yards:0,td:0,tackles:0,sacks:0};
  }
+ window.GMSimPresentation?.season(state);
  state.year++;state.week=1;state.results=[];
  window.GMOwner?.nextSeason(state);state.cash+=35;state.deadCap=0;
  state.engine.season=state.year;state.engine.schedule=freshSchedule();
