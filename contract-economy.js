@@ -145,7 +145,7 @@ function extend(p,s,offer={}){
    years+optionYears>CONFIG.negotiation.maxYears||
    !Number.isInteger(voidYears)||voidYears<0||voidYears>CONFIG.negotiation.maxVoidYears||
    !['TEAM','PLAYER'].includes(holder)||salary<1||bonus<0||guaranteed<0||
-   guaranteed>salary*(years+optionYears)+bonus)
+   guaranteed>salary*years)
    return {ok:false,error:'Invalid contract length, salary, guarantee or option terms'};
  if((clauses.noTrade||clauses.noTag)&&p.rating<CONFIG.negotiation.clauseMinOverall)
    return {ok:false,error:'Player does not qualify for restricted clauses'};
@@ -165,7 +165,7 @@ function extend(p,s,offer={}){
  for(let j=0;j<activeAdded;j++){
    c.baseSalaries.push(salary);
    c.bonusProration.push(prorated);
-   c.guarantees.push(money(guaranteed/activeAdded));
+   c.guarantees.push(j<years?money(guaranteed/years):0);
  }
  const options=[];
  for(let i=0;i<optionYears;i++){
@@ -299,7 +299,8 @@ function release(p,s){
  const c=ensureContract(p,s),offset=Math.max(0,s.year-c.startYear);
  const currentAndFuture=c.bonusProration.slice(offset).reduce((n,v)=>n+(v||0),0);
  const voidBalance=(c.voidProration||[]).filter(x=>!x.accelerated).reduce((n,x)=>n+x.amount,0);
- const amount=money(currentAndFuture+voidBalance);
+ const futureGuaranteedSalary=(c.guarantees||[]).slice(offset+1).reduce((sum,v)=>sum+(v||0),0);
+ const amount=money(currentAndFuture+voidBalance+futureGuaranteedSalary);
  if(amount){
    const l=root.GMContractsAdvanced.ledger(s);l.deadCap[s.year]??=[];
    l.deadCap[s.year].push({team:p.team,playerId:p.id,name:p.name,amount,reason:'RELEASE'});
