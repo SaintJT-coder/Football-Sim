@@ -47,7 +47,8 @@ function applyTeamIdentity(s){
  // Restore original team names so different save slots never contaminate each other.
  if(!root.TEAMS)return;
  for(let i=0;i<root.TEAMS.length;i++){
-   if(ORIGINAL[i]){root.TEAMS[i][0]=ORIGINAL[i][0];root.TEAMS[i][1]=ORIGINAL[i][1];}
+   if(ORIGINAL[i]){root.TEAMS[i][0]=ORIGINAL[i][0];
+     root.TEAMS[i][1]=root.gmTeamPresetName?.(i)||ORIGINAL[i][1];}
  }
  const x=s.franchiseRelocation;
  if(x?.identity&&root.TEAMS[x.team]){
@@ -152,7 +153,7 @@ function page(s){
        ' · Security '+(e.security>=0?'+':'')+e.security+'</p></div>').join('')||
      '<div class="card">No relocation or stadium proposals yet.</div>');
 }
-root.GMRelocation={CONFIG,init,owner,reaction,applyTeamIdentity,
+root.GMRelocation={CONFIG,init,owner,reaction,originalName:i=>ORIGINAL[i]?.[1],applyTeamIdentity,
  propose,decide,stadiumDeal,page};
 root.Gridiron?.register?.('relocation',root.GMRelocation);
 root.gmRelocationPropose=id=>{
