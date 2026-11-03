@@ -135,19 +135,36 @@ function endSeasonV2(){
  setup();
  const standings=TEAMS.map((t,i)=>({i,rec:record(i),power:scoreTeam(i)}))
  .sort((a,b)=>b.rec.w-a.rec.w||((b.power.off+b.power.def)-(a.power.off+a.power.def)));
- const contenders=standings.slice(0,6),playoffs=[];
- while(contenders.length>1){let next=[];for(let i=0;i<contenders.length;i+=2){
-  const a=contenders[i],b=contenders[i+1];if(!b){next.push(a);continue}
-  const win=Math.random()<(0.5+(a.power.off+a.power.def-b.power.off-b.power.def)*.01)?a:b;
-  playoffs.push({round:playoffs.length<3?'Wildcard / Divisional':'Championship',a:a.i,b:b.i,winner:win.i});
-  next.push(win);
- }contenders.splice(0,contenders.length,...next)}
- const champ=contenders[0]?.i??standings[0].i,runner=playoffs.at(-1)?.a===champ?playoffs.at(-1)?.b:playoffs.at(-1)?.a;
+ const playoffs=[];
+ const conferences=[...new Set(TEAMS.map(t=>t[2].split(' ')[0]))];
+ const seeded=conferences.map(conf=>{
+   const clubs=standings.filter(x=>TEAMS[x.i][2].split(' ')[0]===conf);
+   const divisions=[...new Set(clubs.map(x=>TEAMS[x.i][2]))];
+   const winners=divisions.map(d=>clubs.filter(x=>TEAMS[x.i][2]===d)[0]).filter(Boolean);
+   return [...winners,...clubs.filter(x=>!winners.includes(x))].sort((a,b)=>b.rec.w-a.rec.w||((b.power.off+b.power.def)-(a.power.off+a.power.def))).slice(0,3);
+ });
+ function playoffGame(a,b,round,conf){
+   const ap=scoreTeam(a.i),bp=scoreTeam(b.i);
+   const advantage=((ap.off-bp.def)+(ap.def-bp.off))*.18;
+   let sa=Math.max(3,Math.round(24+advantage+(Math.random()-.5)*22));
+   let sb=Math.max(3,Math.round(24-advantage+(Math.random()-.5)*22));
+   if(sa===sb){if(Math.random()<.5)sa+=3;else sb+=3}
+   const winner=sa>sb?a:b;
+   playoffs.push({year:state.year,round,conference:conf,a:a.i,b:b.i,sa,sb,winner:winner.i});
+   return winner;
+ }
+ const finalists=seeded.map((clubs,i)=>{
+   const conf=conferences[i],wild=playoffGame(clubs[1],clubs[2],'Wild Card',conf);
+   return playoffGame(clubs[0],wild,'Conference Final',conf);
+ });
+ const champion=playoffGame(finalists[0],finalists[1],'Championship','League');
+ const champ=champion.i,final=playoffs[playoffs.length-1];
+ const runner=final.a===champ?final.b:final.a;
  state.history.push({year:state.year,champ:TEAMS[champ][1],runner:TEAMS[runner??standings[1].i][1]});
  state.champions.push(champ);
  const mvp=[...state.players].filter(p=>p.pos==='QB').sort((a,b)=>(b.stats.passYards+b.stats.passTD*20-b.stats.interceptions*35)-(a.stats.passYards+a.stats.passTD*20-a.stats.interceptions*35))[0];
  state.awards.push({year:state.year,mvp:mvp?.name||'—'});
- state.engine.playoffs=playoffs;state.engine.awards.push(state.awards.at(-1));
+ state.engine.playoffs=playoffs;state.engine.playoffYear=state.year;state.engine.awards.push(state.awards.at(-1));
  for(const p of state.players){
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
   if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){state.retired.push({...p,retiredYear:state.year});p.team=-2}
@@ -159,6 +176,7 @@ function endSeasonV2(){
  state.engine.season=state.year;state.engine.schedule=freshSchedule();
  state.news.unshift(TEAMS[champ][1]+' won the '+(state.year-1)+' championship!');
  save();render();
+ if(champ===state.team&&typeof window.launchChampionshipCelebration==='function')window.launchChampionshipCelebration(TEAMS[champ][1],state.year-1);
 }
 function scheduleV2(){
  setup();
