@@ -196,16 +196,25 @@ function setOption(p,s,year,exercise){
    return {ok:false,error:'Option deadline has passed'};
  if(o.holder==='PLAYER')return {ok:false,error:'This option belongs to the player'};
  o.decided=true;o.exercised=!!exercise;o.decidedYear=s.year;
- if(!exercise){declineOption(c,o,s)}
+ if(!exercise){declineOption(c,o,s,p)}
  s.news?.unshift(p.name+' '+(exercise?'had a team option exercised':'had a team option declined')+' for '+year+'.');
  return {ok:true,exercised:o.exercised};
 }
-function declineOption(c,o,s){
+function declineOption(c,o,s,p){
  const cutoff=o.year-c.startYear;
- // Option years must be at the end of the active deal; declining ends the playing contract.
+ // Acceleration occurs in the year the option would have started, not on early notice.
+ const remainingBonus=money(c.bonusProration.slice(Math.max(0,cutoff))
+   .reduce((sum,v)=>sum+(v||0),0));
+ if(remainingBonus>0){
+   const l=root.GMContractsAdvanced?.ledger(s);
+   if(l){l.deadCap[o.year]??=[];
+     l.deadCap[o.year].push({team:p.team,playerId:p.id,name:p.name,
+       amount:remainingBonus,reason:'DECLINED OPTION BONUS ACCELERATION'})}
+ }
  c.baseSalaries=c.baseSalaries.slice(0,Math.max(0,cutoff));
  c.guarantees=c.guarantees.slice(0,Math.max(0,cutoff));
  c.options.forEach(x=>{if(x.year>=o.year){x.decided=true;x.exercised=false}});
+ p.years=Math.max(1,c.baseSalaries.length-(s.year-c.startYear));
 }
 function settleOptions(p,s){
  const c=p.contractAdvanced;
@@ -214,12 +223,13 @@ function settleOptions(p,s){
  const pending=c.options.filter(o=>!o.decided&&o.deadlineYear<=s.year)
    .sort((a,b)=>a.year-b.year);
  for(const o of pending){
+   if(o.decided)continue;
    let exercise;
    if(o.holder==='TEAM')exercise=p.rating>=CONFIG.option.teamExerciseRating&&
       o.salary<=market(p)*CONFIG.option.teamMaximumMarketRatio;
    else exercise=o.salary>=market(p)*CONFIG.option.playerExerciseMarketRatio;
    o.decided=true;o.exercised=exercise;o.decidedYear=s.year;
-   if(!exercise)declineOption(c,o,s);
+   if(!exercise)declineOption(c,o,s,p);
    decisions.push({playerId:p.id,year:o.year,exercised:exercise,holder:o.holder});
    s.news?.unshift(p.name+' '+(exercise?'will remain on an option year':'will enter free agency after the contract')+'.');
  }
