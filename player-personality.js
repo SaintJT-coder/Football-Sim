@@ -32,12 +32,12 @@ const CONFIG={
   snaps:{QB:[.98],RB:[.67,.26,.10],WR:[.89,.79,.68,.43],TE:[.79,.32],
     OL:[.98,.98,.98,.98,.98],DL:[.76,.68,.58,.42],LB:[.90,.80,.66],
     CB:[.91,.82,.54],S:[.92,.88],K:[.12]},
-  usage:{basePlays:63,variation:8,highSnaps:60,xpPerSnap:.0012,
+  usage:{basePlays:63,variation:8,highSnaps:60,thresholds:{QB:57,RB:38,WR:49,TE:43,OL:57,DL:42,LB:48,CB:50,S:52,K:7},xpPerSnap:.0012,
     maxXpBonus:.10,fatiguePerHighSnap:.10,maxFatigue:3,
     injuryRiskPerHighSnap:.00010,maxInjuryRisk:.003},
   xp:{min:.78,max:1.25,fitPerPoint:.0025,fitCenter:75},
-  morale:{positiveFit:86,negativeFit:65,maxWeeklyChange:2},
-  holdout:{min:.65,max:1.65,fitScale:.003},
+  morale:{positiveFit:86,negativeFit:65,maxWeeklyChange:1},
+  holdout:{min:.80,max:1.30,fitScale:.003},
   event:{
     firstWeek:4,lastWeek:16,maxEventsPerSeason:1,
     breakout:{base:.0035,ageYoung:1.8,ageOld:.65,highUsage:1.6,goodFit:1.45,badFit:.65,max:.018,ratingGain:[1,2],xp:180,morale:3},
@@ -45,7 +45,7 @@ const CONFIG={
   }
 };
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,Number(n)||0));
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const hash=v=>{let n=2166136261;for(const ch of String(v)){n=Math.imul(n^ch.charCodeAt(0),16777619)}return n>>>0};
 const defensive=new Set(['DL','LB','CB','S']);
 function ensure(p){
@@ -69,7 +69,7 @@ function ensure(p){
 function schemeFit(p,s){
  if(!s||p.team<0)return 75;
  const side=defensive.has(p.pos)?'defense':'offense';
- const scheme=root.GMFranchise?.scheme(s,p.team,side);
+ const scheme=s.franchiseSystems?.schemes?.[p.team]?.[side]||(side==='offense'?'Balanced':'Cover 3');
  return clamp(root.GMCoaching?.schemeFit(p,scheme)??root.GMFranchise?.fit(p,scheme)??75,0,100);
 }
 function factors(p,s){
@@ -79,7 +79,7 @@ function factors(p,s){
  const coach=CONFIG.philosophies[philosophy]||CONFIG.philosophies.Balanced;
  const fit=schemeFit(p,s),fitXP=1+(fit-CONFIG.xp.fitCenter)*CONFIG.xp.fitPerPoint;
  const usage=d.snaps.last?.year===s?.year&&d.snaps.last?.week===s?.week
-   ?Math.min(CONFIG.usage.maxXpBonus,Math.max(0,d.snaps.last.count-CONFIG.usage.highSnaps)*CONFIG.usage.xpPerSnap):0;
+   ?Math.min(CONFIG.usage.maxXpBonus,Math.max(0,d.snaps.last.count-(CONFIG.usage.thresholds[p.pos]??CONFIG.usage.highSnaps))*CONFIG.usage.xpPerSnap):0;
  const xp=clamp(traits.reduce((n,t)=>n*t.xp,coach.xp)*fitXP*(1+usage),CONFIG.xp.min,CONFIG.xp.max);
  const morale=clamp(traits.reduce((n,t)=>n+t.morale,0)+coach.morale+
    (fit>=CONFIG.morale.positiveFit?1:fit<=CONFIG.morale.negativeFit?-1:0),
@@ -107,7 +107,7 @@ function recordGame(s,g,team,passShare=.53){
      const d=ensure(p),sn=d.snaps;if(sn.last?.key===key)return;
      if(sn.year!==s.year){sn.year=s.year;sn.season=0}
      let share=fractions[i];
-     if(pos==='RB')share*=clamp(1.08-passShare,.65,1.15);
+     if(pos==='RB')share*=clamp(1+(.53-passShare)*.6,.85,1.15);
      if(pos==='WR'||pos==='TE')share*=clamp(passShare+.47,.75,1.25);
      const n=Math.max(1,Math.round(plays*share));
      sn.season+=n;sn.total+=n;sn.last={key,year:s.year,week:s.week,count:n,team};
@@ -118,8 +118,8 @@ function recordGame(s,g,team,passShare=.53){
  return count;
 }
 function snapsThisWeek(p,s){const last=ensure(p)?.snaps.last;return last?.year===s.year&&last?.week===s.week?last.count:0}
-function usageFatigue(snaps){return clamp((snaps-CONFIG.usage.highSnaps)*CONFIG.usage.fatiguePerHighSnap,0,CONFIG.usage.maxFatigue)}
-function usageInjuryRisk(snaps){return clamp((snaps-CONFIG.usage.highSnaps)*CONFIG.usage.injuryRiskPerHighSnap,0,CONFIG.usage.maxInjuryRisk)}
+function usageFatigue(snaps,p){return clamp((snaps-(CONFIG.usage.thresholds[p?.pos]??CONFIG.usage.highSnaps))*CONFIG.usage.fatiguePerHighSnap,0,CONFIG.usage.maxFatigue)}
+function usageInjuryRisk(snaps,p){return clamp((snaps-(CONFIG.usage.thresholds[p?.pos]??CONFIG.usage.highSnaps))*CONFIG.usage.injuryRiskPerHighSnap,0,CONFIG.usage.maxInjuryRisk)}
 function weeklyMorale(s){
  for(const p of s.players.filter(eligible)){
    const d=ensure(p),key=s.year+':'+s.week;
@@ -131,7 +131,7 @@ function weeklyMorale(s){
 function odds(p,s){
  const age=Number(p.age||27),snaps=ensure(p).snaps.season,
    games=Math.max(1,s.week-1),usage=snaps/games,fit=schemeFit(p,s),e=CONFIG.event;
- const young=age<=26,old=age>=31,high=usage>=CONFIG.usage.highSnaps;
+ const young=age<=26,old=age>=31,high=usage>=(CONFIG.usage.thresholds[p.pos]??CONFIG.usage.highSnaps);
  let breakout=e.breakout.base*(young?e.breakout.ageYoung:old?e.breakout.ageOld:1)*
    (high?e.breakout.highUsage:1)*(fit>=85?e.breakout.goodFit:fit<=65?e.breakout.badFit:1);
  let regression=e.regression.base*(old?e.regression.ageOld:young?e.regression.ageYoung:1)*
