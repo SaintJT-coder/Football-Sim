@@ -90,7 +90,7 @@ function accuracy(p,s){
    (d.combine?CONFIG.scouting.combineAccuracy:0)+
    (d.proDay?CONFIG.scouting.proDayAccuracy:0)+
    (d.reviews||0)*CONFIG.scouting.workoutAccuracy+
-   (p.draftEvaluation?.interviewed?.02:0),0,CONFIG.scouting.maxAccuracy);
+   (p.draftEvaluation?.interviewed ? .02 : 0),0,CONFIG.scouting.maxAccuracy);
 }
 function estimated(p,s){
  const d=p.draftRealism;if(!d)return Number(p.projection)||65;
