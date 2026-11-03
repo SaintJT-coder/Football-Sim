@@ -47,7 +47,7 @@ function scoutingPage(){let f=init();return title('Scouting Department','Spend p
  +heading('SCOUTING REPORTS')+prospectRows(f.prospects.filter(p=>!p.drafted).sort((a,b)=>b.projection-a.projection).slice(0,50),false)}
 const itemKey=(x)=>x.kind+':'+x.id;
 const value=(x,team)=>x.kind==='pick'?pickValue(init().picks.find(p=>p.id===x.id)||{round:7,slot:12}):playerValue(state.players.find(p=>String(p.id)===String(x.id))||{rating:50,pot:50,age:30,pos:'QB',salary:0},team);
-function tradeItems(team){let f=init();return [...roster(team).map(p=>({kind:'player',id:p.id,name:p.name+' · '+p.pos+' · '+p.rating+' OVR · '+cash(p.salary),val:Math.round(playerValue(p,team))})),...f.picks.filter(p=>p.owner===team&&!p.used).map(p=>({kind:'pick',id:p.id,name:'R'+p.round+' Pick '+p.slot+' ('+p.id+')',val:pickValue(p)}))]}
+function tradeItems(team){let f=init();return [...roster(team).map(p=>({kind:'player',id:p.id,name:p.name+' · '+p.pos+' · '+p.rating+' OVR · '+cash(p.salary)+(window.GMContractEconomy&&!GMContractEconomy.canTrade(p)?' · NO-TRADE':''),val:Math.round(playerValue(p,team))})),...f.picks.filter(p=>p.owner===team&&!p.used).map(p=>({kind:'pick',id:p.id,name:'R'+p.round+' Pick '+p.slot+' ('+p.id+')',val:pickValue(p)}))]}
 function toggleAsset(side,kind,id){let f=init(),list=side==='out'?f.selectedOut:f.selectedIn,key=kind+':'+id,index=list.findIndex(x=>itemKey(x)===key);if(index<0){if(list.length>=6)return notice('Maximum six assets per side');list.push({kind,id})}else list.splice(index,1);f.counter=null;render()}
 function tradeValue(items,recipient){return items.reduce((sum,x)=>sum+value(x,recipient),0)}
 function tradeAssessment(){let f=init(),other=state.selectedTrade;let ours=tradeValue(f.selectedOut,other),theirs=tradeValue(f.selectedIn,state.team);
@@ -58,6 +58,7 @@ function tradeAssessment(){let f=init(),other=state.selectedTrade;let ours=trade
 function propose(){let f=init(),other=state.selectedTrade;if(window.GMWeeklyGameplan?.tradeTerms(state,other).open===false||(!window.GMWeeklyGameplan&&state.week>12))return notice('Trade deadline has passed');if(!f.selectedOut.length||!f.selectedIn.length)return notice('Select assets from both teams');
  const assess=tradeAssessment();if(!assess.accepted){f.counter={needed:Math.ceil(assess.expected-assess.ours-assess.otherNeeds)};save();render();return}
  const outgoing=f.selectedOut.filter(x=>x.kind==='player').map(x=>state.players.find(p=>p.id===x.id)),incoming=f.selectedIn.filter(x=>x.kind==='player').map(x=>state.players.find(p=>p.id===x.id));
+ if(window.GMContractEconomy){const blocked=[...outgoing,...incoming].find(p=>!GMContractEconomy.canTrade(p));if(blocked)return notice('Trade prohibited: '+blocked.name+' has a no-trade clause.');}
  const myNewCap=capspace()+outgoing.reduce((s,p)=>s+p.salary,0)-incoming.reduce((s,p)=>s+p.salary,0);
  const otherNewCap=state.cap-payroll(other)+incoming.reduce((s,p)=>s+p.salary,0)-outgoing.reduce((s,p)=>s+p.salary,0);
  if(myNewCap<0||otherNewCap<0)return notice('Trade rejected: salary cap violation');
