@@ -62,7 +62,8 @@ function gainXP(p,amount,s=root.Gridiron?.getState?.()){
  const d=ensure(p);if(!d)return 0;
  const multiplier=[1,1.25,1.5,1.75][TRAITS.indexOf(d.trait)]||1;
  const personality=root.GMPlayerPersonality?.xpMultiplier(p,s)??1;
- const xp=Math.max(0,Math.round(amount*multiplier*personality*(p.morale>=80?1.08:1)));
+ const coaching=root.GMStaff?.developmentMultiplier(p,s)??1;
+ const xp=Math.max(0,Math.round(amount*multiplier*personality*coaching*(p.morale>=80?1.08:1)));
  d.xp+=xp;d.totalXP+=xp;
  let levels=0;
  while(d.xp>=threshold(p)&&levels<3&&p.rating<p.pot){
