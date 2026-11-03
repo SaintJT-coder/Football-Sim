@@ -83,7 +83,7 @@ function openConference(s,week=s.week){
  if(d.processed.includes(key))return null;
  const game=teamGame(s,week);
  const meeting={key,year:s.year,week,opponent:game?(game.a===s.team?game.b:game.a):null,
-   result:game?(game.sa>game.sb?game.a===s.team:game.b===s.team?'W':'L'):'BYE',
+   result:game?((game.sa>game.sb?game.a:game.b)===s.team?'W':'L'):'BYE',
    questions:questionSet(s,game),answers:[],completed:false};
  d.active=meeting;d.processed.push(key);
  return meeting;
