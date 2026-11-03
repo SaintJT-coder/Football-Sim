@@ -41,7 +41,8 @@ jobs:
                           tests/contracts-priority4-smoke.js \
                           tests/draft-priority5-smoke.js \
                           tests/league-narratives-priority6-smoke.js \
-                          tests/presentation-priority7-smoke.js; do
+                          tests/presentation-priority7-smoke.js \
+                          tests/qa-menu-roster-scouting-smoke.js; do
             echo "::group::Running $testfile"
             node "$testfile"
             result=$?
