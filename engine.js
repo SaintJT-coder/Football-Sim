@@ -12,22 +12,16 @@ const scoreTeam=(team)=>{ if(window.GMFranchise){const x=GMFranchise.score(state
  return {off:off||58,def:def||58,spec:spec||60};
 };
 const freshSchedule=()=>{
- const clubs=Array.from({length:TEAMS.length},(_,i)=>i),weeks=[];
- for(let w=0;w<18;w++){
-  let pairs=[],used=new Set();
-  for(let i=0;i<clubs.length;i++){
-   if(used.has(i))continue;
-   let choices=clubs.filter(j=>j!==i&&!used.has(j));
-   choices.sort((a,b)=>{
-    let count=x=>weeks.flat().filter(g=>(g.a===i&&g.b===x)||(g.a===x&&g.b===i)).length;
-    return count(a)-count(b)+Math.random()-.5;
-   });
-   let j=choices[0];if(j===undefined)continue;
-   used.add(i);used.add(j);pairs.push({a:w%2?j:i,b:w%2?i:j,week:w+1});
+ const teams=Array.from({length:TEAMS.length},(_,i)=>i),schedule=[];
+ for(let round=0;round<17;round++){
+  const week=round===8?18:round+1;
+  for(let i=0;i<16;i++){
+   const a=teams[i],b=teams[31-i];
+   schedule.push({a:round%2?b:a,b:round%2?a:b,week});
   }
-  weeks.push(pairs);
+  teams.splice(1,0,teams.pop());
  }
- return weeks.flat();
+ return schedule;
 };
 function setup(){
  window.GMFranchise?.init(state);
@@ -118,7 +112,7 @@ function simulateV2(){
  setup();
  if(state.week>18){endSeasonV2();return}
  const games=state.engine.schedule.filter(g=>g.week===state.week);
- if(!games.length)return alert('No games scheduled for this week');
+ if(!games.length){state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
  for(const g of games){const result=game({...g});state.results.push(result)}
  for(const p of state.players){
@@ -141,7 +135,8 @@ function endSeasonV2(){
    const clubs=standings.filter(x=>TEAMS[x.i][2].split(' ')[0]===conf);
    const divisions=[...new Set(clubs.map(x=>TEAMS[x.i][2]))];
    const winners=divisions.map(d=>clubs.filter(x=>TEAMS[x.i][2]===d)[0]).filter(Boolean);
-   return [...winners,...clubs.filter(x=>!winners.includes(x))].sort((a,b)=>b.rec.w-a.rec.w||((b.power.off+b.power.def)-(a.power.off+a.power.def))).slice(0,3);
+   const ordered=(xs)=>xs.sort((a,b)=>b.rec.w-a.rec.w||((b.power.off+b.power.def)-(a.power.off+a.power.def)));
+   return [...ordered(winners),...ordered(clubs.filter(x=>!winners.includes(x)))].slice(0,7).map((x,i)=>({...x,seed:i+1}));
  });
  function playoffGame(a,b,round,conf){
    const ap=scoreTeam(a.i),bp=scoreTeam(b.i);
@@ -154,10 +149,13 @@ function endSeasonV2(){
    return winner;
  }
  const finalists=seeded.map((clubs,i)=>{
-   const conf=conferences[i],wild=playoffGame(clubs[1],clubs[2],'Wild Card',conf);
-   return playoffGame(clubs[0],wild,'Conference Final',conf);
+   const conf=conferences[i];
+   const wild=[playoffGame(clubs[1],clubs[6],'Wild Card',conf),playoffGame(clubs[2],clubs[5],'Wild Card',conf),playoffGame(clubs[3],clubs[4],'Wild Card',conf)];
+   wild.sort((a,b)=>b.seed-a.seed);
+   const divisional=[playoffGame(clubs[0],wild[0],'Divisional',conf),playoffGame(wild[1],wild[2],'Divisional',conf)];
+   return playoffGame(divisional[0],divisional[1],'Conference Final',conf);
  });
- const champion=playoffGame(finalists[0],finalists[1],'Championship','League');
+ const champion=playoffGame(finalists[0],finalists[1],'Super Bowl','League');
  const champ=champion.i,final=playoffs[playoffs.length-1];
  const runner=final.a===champ?final.b:final.a;
  state.history.push({year:state.year,champ:TEAMS[champ][1],runner:TEAMS[runner??standings[1].i][1]});
