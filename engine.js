@@ -3,7 +3,7 @@
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const avg=(xs)=>xs.length?xs.reduce((s,n)=>s+n,0)/xs.length:0;
 const pick=(xs)=>xs[Math.floor(Math.random()*xs.length)];
-const depth=(team,pos,n=1)=>(window.GMFranchise?GMFranchise.depth(state,team,pos):roster(team).filter(p=>p.pos===pos).sort((a,b)=>b.rating-a.rating)).filter(p=>!(Number(p.injury)>0)).slice(0,n);
+const depth=(team,pos,n=1)=>(window.GMFranchise?GMFranchise.depth(state,team,pos):roster(team).filter(p=>p.pos===pos).sort((a,b)=>b.rating-a.rating)).filter(p=>!(Number(p.injury)>0)&&!p.contractAdvanced?.holdout).slice(0,n);
 const scoreTeam=(team)=>{ if(window.GMFranchise){const x=GMFranchise.score(state,team);return {off:x.offense,def:x.defense,spec:x.special};}
  const unit=(positions)=>avg(positions.flatMap(([pos,n])=>depth(team,pos,n).map(p=>p.rating*(1-(p.fatigue||0)*.003)+((p.morale??65)-65)*.06)));
  const off=unit([['QB',1],['RB',1],['WR',3],['TE',1],['OL',5]]);
@@ -89,29 +89,32 @@ function game(g){
   const passYards=Math.round(totalYards*passShare),rushYards=totalYards-passYards;
   const tds=Math.min(7,Math.floor(forPts/7));
   const previousInts=q?(q.stats.interceptions||0):0;
-  if(q){let attempts=clamp(Math.round(30+(passShare-.53)*35+noise(12)),16,52),completion=clamp(.49+(q.rating-60)*.004+noise(.12)+(weather==='Rain'?-.035:weather==='Snow'?-.065:weather==='Wind'?-.045:0),.35,.79);
+  if(q){let attempts=clamp(Math.round(30+(passShare-.53)*35+noise(12)),16,52),completion=clamp(.49+(q.rating-60)*.004+noise(.12)+(window.GMPlayerPersonality?.performanceModifier(q,'pass')||0)*.20+(weather==='Rain'?-.035:weather==='Snow'?-.065:weather==='Wind'?-.045:0),.35,.79);
    q.stats.attempts+=attempts;q.stats.completions+=Math.round(attempts*completion);
    q.stats.passYards+=passYards;q.stats.passTD+=Math.max(0,Math.round(tds*passShare));
    q.stats.interceptions+=Math.random()<clamp(.2-(q.rating-70)*.003,.03,.24)?1:0;
    q.stats.yards+=passYards;q.stats.td+=Math.max(0,Math.round(tds*passShare));
   }
-  distribute(rbs,rushYards,'rushYards',p=>Math.max(1,p.rating-48));
-  distribute(receivers,passYards,'receivingYards',p=>Math.max(1,p.rating-48)*(p.pos==='WR'?1.2:.8));
+  distribute(rbs,rushYards,'rushYards',p=>Math.max(1,p.rating-48)*(1+(window.GMPlayerPersonality?.performanceModifier(p,'run')||0)));
+  distribute(receivers,passYards,'receivingYards',p=>Math.max(1,p.rating-48)*(p.pos==='WR'?1.2:.8)*(1+(window.GMPlayerPersonality?.performanceModifier(p,'receive')||0)));
   distribute(receivers,Math.round(passYards/12),'receptions',p=>Math.max(1,p.rating-48));
   distribute(rbs,Math.max(0,tds-Math.round(tds*passShare)),'rushTD',p=>Math.max(1,p.rating-48));
   for(const p of [...rbs,...receivers]){p.stats.yards=(p.stats.rushYards||0)+(p.stats.receivingYards||0);p.stats.td=(p.stats.rushTD||0)+(p.stats.recTD||0)}
   const thirdDownAttempts=rand(9,16),thirdDownConversions=clamp(Math.round(thirdDownAttempts*(.32+(scoreTeam(team).off-65)*.003+noise(.08))),0,thirdDownAttempts);
   teamLines.push({team,points:forPts,totalYards,passYards,rushYards,passShare:+passShare.toFixed(2),thirdDownAttempts,thirdDownConversions,turnovers:q?Math.max(0,(q.stats.interceptions||0)-previousInts):0});
   const defense=roster(team).filter(p=>['DL','LB','CB','S'].includes(p.pos)&&!p.injury);
-  distribute(defense,clamp(Math.round(50+noise(14)),35,75),'tackles',p=>p.rating);
+  distribute(defense,clamp(Math.round(50+noise(14)),35,75),'tackles',p=>p.rating*(1+(window.GMPlayerPersonality?.performanceModifier(p,'defense')||0)));
   distribute(defense.filter(p=>['DL','LB'].includes(p.pos)),clamp(Math.round((35-againstPts)/12+noise(2)),0,5),'sacks',p=>p.rating);
+  window.GMPlayerPersonality?.recordGame(state,g,team,passShare);
   for(const p of roster(team).filter(p=>!window.GMRosterRules||GMRosterRules.playable(p))){
-   p.stats.games++;p.fatigue=clamp((p.fatigue||0)+rand(5,14),0,100);
-   const injuryRisk=.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0);
+   const snaps=window.GMPlayerPersonality?.snapsThisWeek(p,state)??40;
+   if(snaps<=0)continue;
+   p.stats.games++;p.fatigue=clamp((p.fatigue||0)+rand(5,14)+(window.GMPlayerPersonality?.usageFatigue(snaps)||0),0,100);
+   const injuryRisk=.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0)+(window.GMPlayerPersonality?.usageInjuryRisk(snaps)||0);
    if(Number(p.injury)>0){if(!window.GMInjuries)p.injury--;continue}
    if(Math.random()<injuryRisk){if(window.GMInjuries){const injury=GMInjuries.randomInjury(p,state);if(injury.ok)state.news.unshift(p.name+' diagnosed with '+injury.injury.name+' ('+injury.injury.estimate+' estimated weeks)')}else{p.injury=rand(1,5);state.news.unshift(p.name+' suffered an injury ('+p.injury+' weeks)')}}
    p.morale=clamp(p.morale+(forPts>againstPts?rand(0,3):-rand(0,3)),15,100);
-   p.development+=Math.max(0,(p.pot-p.rating))*Math.max(.05,(31-p.age)/100);
+   if(!window.GMDevelopment)p.development=(Number(p.development)||0)+Math.max(0,(p.pot-p.rating))*Math.max(.05,(31-p.age)/100);
   }
  }
  g.report=buildReport(g,context,teamLines);
@@ -124,6 +127,7 @@ function simulateV2(){
  const games=state.engine.schedule.filter(g=>g.week===state.week);
  window.GMContractsAdvanced?.weekly(state);
  window.GMCoaching?.weekly(state);
+ window.GMPlayerPersonality?.weeklyMorale(state);
  window.GMRosterRules?.weekly(state);
  window.GMInjuries?.weekly(state);
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
@@ -132,6 +136,7 @@ function simulateV2(){
  for(const g of games){const result=game({...g});state.results.push(result);window.GMSimPresentation?.report(state,result)}
  window.Gridiron?.emit('week:games-complete',{state,year:state.year,week:state.week,games:state.results.filter(g=>g.year===state.year&&g.week===state.week)});
  window.GMDevelopment?.weekly(state,devBefore);
+ window.GMPlayerPersonality?.midseason(state);
  if(window.GMContractsAdvanced)for(const p of state.players.filter(x=>x.team>=0))GMContractsAdvanced.incentiveCheck(p,state,{teamWins:record(p.team).w});
  for(const p of state.players){
   const recovery=(plan==='Recovery'?18:plan==='Development'?7:12)+(window.GMOwner?.modifiers(state).fatigueRecovery||0);
