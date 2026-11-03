@@ -283,10 +283,15 @@ function page(s){
    '<button onclick="gmDraftRealAction(\''+p.id+'\',\'proDay\')">PRO DAY</button> '+
    '<button onclick="gmDraftRealAction(\''+p.id+'\',\'workout\')">WORKOUT</button></div></div>';
  }).join('')+'</div><h2>FIFTH-YEAR OPTION DEADLINES</h2>'+
- (options.map(p=>{const o=p.draftFifthYear;return '<div class="card"><b>'+esc(p.name)+'</b> · '+
+ (options.map(p=>{const o=p.draftFifthYear,open=s.year===o.deadlineYear&&s.week<=o.deadlineWeek;
+   return '<div class="card"><b>'+esc(p.name)+'</b> · '+
    p.rating+' OVR · '+o.optionYear+' option · $'+o.salary+'M · Decision due by '+
-   o.deadlineYear+' Week '+o.deadlineWeek+' <button onclick="gmDraftFifth('+p.id+',true)">EXERCISE</button> '+
-   '<button onclick="gmDraftFifth('+p.id+',false)">DECLINE</button></div>';}).join('')||
+   o.deadlineYear+' Week '+o.deadlineWeek+
+   (open?' <button onclick="gmDraftFifth('+p.id+',true)">EXERCISE</button> '+
+     '<button onclick="gmDraftFifth('+p.id+',false)">DECLINE</button>':
+     '<p class="muted">Option decision opens in '+o.deadlineYear+
+       '. If no choice is made before that season ends, a rating-based automatic decision applies.</p>')+
+   '</div>';}).join('')||
  '<div class="card">No outstanding fifth-year option decisions.</div>')+
  '<h2>DRAFT PICK TRADES</h2>'+
  '<div class="card"><p class="sub">Trade unused picks with AI clubs. Values follow a declining seven-round chart with team-need premiums.</p>'+
