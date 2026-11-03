@@ -61,6 +61,29 @@ const {chromium}=require('playwright');
  await page.evaluate(()=>{page='Depth Chart';render()});
  const count=await page.locator('#app button[onclick^="gmMoveDepth"]').count();
  if(count<2)throw Error('Depth chart buttons missing');
+ // Audit every registered game page, not only the primary tabs.
+ for(const tab of await page.evaluate(()=>pages.slice())){
+  await page.evaluate(tab=>{page=tab;render()},tab);
+  const content=await page.locator('#app').innerText();
+  if(!content.trim())throw Error('Blank game tab: '+tab);
+ }
+ // Validate new-game slot isolation, deletion, and saved-team selection.
+ await page.evaluate(()=>openGridironMenu());
+ await page.locator('#gm-menu [data-action="new"]').click();
+ await page.locator('#gm-menu [data-team="1"]').click();
+ await page.locator('#gm-menu #gm-slot').selectOption('1');
+ await page.locator('#gm-menu [data-action="start"]').click();
+ const second=await page.evaluate(()=>({team:state.team,slot:state.menuSlot}));
+ if(second.team!==1||second.slot!==1)throw Error('Second franchise team/slot not selected');
+ await page.evaluate(()=>openGridironMenu());
+ await page.locator('#gm-menu [data-action="load"]').click();
+ if(await page.locator('#gm-menu [data-load]').count()!==2)throw Error('Expected two independent save slots');
+ await page.locator('#gm-menu [data-load="0"]').click();
+ if(await page.evaluate(()=>state.menuSlot)!==0)throw Error('Slot 1 did not load');
+ // A complete regular season should simulate without throwing or duplicating games.
+ await page.evaluate(()=>{for(let i=0;i<17;i++)simulate()});
+ const season=await page.evaluate(()=>({week:state.week,results:state.results.filter(g=>g.year===state.year).length}));
+ if(season.week!==19||season.results!==108)throw Error('Season progression invalid: '+JSON.stringify(season));
  if(errors.length)throw Error('Browser exceptions: '+errors.join(' | '));
  console.log('PASS mobile navigation, 6-game simulation, reports, saves, depth chart and box scores');
  await browser.close();
