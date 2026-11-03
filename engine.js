@@ -70,7 +70,8 @@ function game(g){
  const boost=t=>{const ps=roster(t).filter(p=>p.injury<=0).slice(0,12);return ps.length?ps.reduce((v,p)=>v+(window.GMDevelopment?.abilityBoost(p,{playType:'pass',scheme:window.GMFranchise?.scheme(state,t,'offense')})||0),0)/ps.length:0};
  a.off*=1+boost(g.a);b.off*=1+boost(g.b);
  if(coach){const apply=(own,other)=>{if(own===state.team){const delta=(coach.blitz-35)*.04;other.off-=delta;if(coach.redZone==='Aggressive')return 1.5;if(coach.redZone==='Run'||coach.redZone==='Pass')return .5}return 0};a.off+=apply(g.a,b);b.off+=apply(g.b,a)}
- const sa=clamp(points(a.off,b.def,true)+Math.round(context.homeField-1.5)+context.homeStreak+weatherPenalty,0,56),sb=clamp(points(b.off,a.def,false)+context.awayStreak+weatherPenalty,0,56);
+ const ownerHome=window.GMOwner?.modifiers(state).homeField||0;
+ const sa=clamp(points(a.off,b.def,true)+Math.round(context.homeField-1.5)+(g.a===state.team?ownerHome:0)+context.homeStreak+weatherPenalty,0,56),sb=clamp(points(b.off,a.def,false)+context.awayStreak+weatherPenalty,0,56);
  const teamLines=[];
  g.sa=sa===sb?sa+3:sa;g.sb=sb;g.year=state.year;
  for(const [team,forPts,againstPts] of [[g.a,g.sa,g.sb],[g.b,g.sb,g.sa]]){
@@ -122,17 +123,18 @@ function simulateV2(){
  window.GMCoaching?.weekly(state);
  window.GMRosterRules?.weekly(state);
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
- if(!games.length){state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
+ if(!games.length){window.GMOwner?.weekly(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
  for(const g of games){const result=game({...g});state.results.push(result)}
  window.GMDevelopment?.weekly(state,devBefore);
  if(window.GMContractsAdvanced)for(const p of state.players.filter(x=>x.team>=0))GMContractsAdvanced.incentiveCheck(p,state,{teamWins:record(p.team).w});
  for(const p of state.players){
-  const recovery=plan==='Recovery'?18:plan==='Development'?7:12;
+  const recovery=(plan==='Recovery'?18:plan==='Development'?7:12)+(window.GMOwner?.modifiers(state).fatigueRecovery||0);
   p.fatigue=clamp(p.fatigue-recovery+(intensity==='High'?5:intensity==='Low'?-5:0),0,100);
   if(!window.GMDevelopment&&p.age<29&&p.rating<p.pot&&p.development>=5){p.rating++;p.development-=5}
  }
  e.trainingPoints=clamp((e.trainingPoints||0)+(plan==='Development'?5:plan==='Recovery'?2:3),0,30);
+ window.GMOwner?.weekly(state);
  const rec=record(state.team);e.jobSecurity=clamp((e.jobSecurity??60)+(rec.w>=rec.l?2:-2),0,100);
  state.cash+=rand(2,8);state.news.unshift('Week '+state.week+' complete: '+rec.w+'-'+rec.l+' season record');
  state.week++;selectedWeek=state.week;save();render();
@@ -174,6 +176,7 @@ function endSeasonV2(){
  state.champions.push(champ);
  const mvp=[...state.players].filter(p=>p.pos==='QB').sort((a,b)=>(b.stats.passYards+b.stats.passTD*20-b.stats.interceptions*35)-(a.stats.passYards+a.stats.passTD*20-a.stats.interceptions*35))[0];
  state.awards.push({year:state.year,mvp:mvp?.name||'—'});
+ window.GMOwner?.seasonEnd(state,{champion:champ===state.team,playoffs:playoffs.some(g=>g.a===state.team||g.b===state.team),division:seeded.some(c=>c[0]?.i===state.team)});
  state.engine.playoffs=playoffs;state.engine.playoffYear=state.year;state.engine.awards.push(state.awards.at(-1));
  window.GMContractsAdvanced?.season(state,Object.fromEntries(TEAMS.map((_,i)=>[i,{teamWins:record(i).w,playoffs:playoffs.some(g=>g.a===i||g.b===i)}])));
  for(const p of state.players){
@@ -183,7 +186,8 @@ function endSeasonV2(){
   if(window.GMDevelopment)GMDevelopment.aging(p);else p.rating=clamp(p.rating+(p.age<27?rand(0,2):p.age>31?rand(-3,0):rand(-1,1)),45,p.pot);
   p.stats={yards:0,td:0,tackles:0,sacks:0};
  }
- state.year++;state.week=1;state.results=[];state.cash+=35;state.deadCap=0;
+ state.year++;state.week=1;state.results=[];
+ window.GMOwner?.nextSeason(state);state.cash+=35;state.deadCap=0;
  state.engine.season=state.year;state.engine.schedule=freshSchedule();
  state.news.unshift(TEAMS[champ][1]+' won the '+(state.year-1)+' championship!');
  save();render();
