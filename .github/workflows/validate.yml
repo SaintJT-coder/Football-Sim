@@ -24,3 +24,9 @@ jobs:
           assert 'franchise-integration.js' in html
           print('Script references validated')
           PY
+      - name: Install browser test dependencies
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Run mobile browser regression
+        run: node tests/smoke.cjs
