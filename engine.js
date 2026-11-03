@@ -202,6 +202,7 @@ function endSeasonV2(){
  state.engine.playoffs=playoffs;state.engine.playoffYear=state.year;state.engine.awards.push(state.awards.at(-1));
  const contractContext=Object.fromEntries(TEAMS.map((_,i)=>[i,{teamWins:record(i).w,playoffs:playoffs.some(g=>g.a===i||g.b===i)}]));
  window.GMContractsAdvanced?.season(state,contractContext);
+ window.GMDraftRealism?.seasonEnd(state);
  window.GMContractEconomy?.seasonEnd(state,contractContext);
  for(const p of state.players){
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
