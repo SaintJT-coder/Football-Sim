@@ -19,6 +19,7 @@ const state={year:2026,week:6,team:0,players,results:[],news:[],
  cash:200,cap:350,history:[],awards:[],
  ownerFranchise:{jobSecurity:75,fanHappiness:65,mediaHeat:25,facilities:{stadium:1}}};
 const scope={TEAMS,state,window:null,console,Math,JSON,
+ document:{getElementById:()=>({})},
  Gridiron:{register:()=>{}},
  GMOwner:{init:s=>s.ownerFranchise},
  save:()=>{},render:()=>{scope.GMRelocation?.applyTeamIdentity(state)},alert:message=>{throw Error(message)},
