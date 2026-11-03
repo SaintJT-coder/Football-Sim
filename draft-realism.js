@@ -109,7 +109,9 @@ function scout(p,s){
   reports:already};
 }
 function combine(p,s){
- const d=enrich(p,s);if(!d.combine){
+ const d=enrich(p,s);const budget=resources(s);if(!d.combine){
+   if(budget.combineReview<=0)return {ok:false,error:'No combine film reviews remaining'};
+   budget.combineReview--;
    const r=rng('combine:'+s.year+':'+p.id),speed=(d.trueAttributes.speed||p.athletic||70);
    const power=(d.trueAttributes.strength||p.rating||70);
    d.combine={
@@ -147,9 +149,10 @@ function workout(p,s){
 }
 function resources(s){
  const d=s.draftRealismResources??={year:s.year,proDays:CONFIG.resources.proDays,
-   privateWorkouts:CONFIG.resources.privateWorkouts};
+   privateWorkouts:CONFIG.resources.privateWorkouts,combineReview:CONFIG.resources.combineReview};
  if(d.year!==s.year){d.year=s.year;d.proDays=CONFIG.resources.proDays;
-   d.privateWorkouts=CONFIG.resources.privateWorkouts}
+   d.privateWorkouts=CONFIG.resources.privateWorkouts;d.combineReview=CONFIG.resources.combineReview}
+ d.combineReview??=CONFIG.resources.combineReview;
  return d;
 }
 function publicGrade(p,s){
@@ -157,11 +160,11 @@ function publicGrade(p,s){
  return {overall:estimated(p,s),margin:Math.max(1,Math.ceil((1-confidence)*CONFIG.scouting.initialError)),
    confidence:Math.round(confidence*100),combine:d.combine,proDay:d.proDay};
 }
-function draftValue(p,team,s){
+function draftValue(p,team,s,positionNeed){
  // CPU scouting is imperfect, includes positional scarcity and small stable noise.
- const base=estimated(p,s),roster=s.players.filter(x=>x.team===team&&x.pos===p.pos),
- best=Math.max(40,...roster.map(x=>Number(x.rating)||40)),
- shortage=Math.max(0,78-best)*.25+Math.max(0,2-roster.length)*2.5,
+ const base=estimated(p,s),roster=Number.isFinite(positionNeed)?null:s.players.filter(x=>x.team===team&&x.pos===p.pos),
+ best=roster?Math.max(40,...roster.map(x=>Number(x.rating)||40)):70,
+ shortage=roster?(Math.max(0,78-best)*.25+Math.max(0,2-roster.length)*2.5):positionNeed*.6,
  noise=(hash(team+':'+p.id)%13)-6;
  return base+(p.pot||base)*.14+shortage+noise*.3;
 }
@@ -227,6 +230,7 @@ function decideFifthYear(p,s,exercise,automatic=false){
  const o=p?.draftFifthYear;
  if(!o||o.decided)return {ok:false,error:'No available fifth-year option'};
  if(p.team!==s.team)return {ok:false,error:'Only your first-round picks can be managed'};
+ if(!automatic&&s.year<o.deadlineYear)return {ok:false,error:'Option decisions open in '+o.deadlineYear};
  if(!automatic&&(s.year>o.deadlineYear||(s.year===o.deadlineYear&&s.week>o.deadlineWeek)))
    return {ok:false,error:'Fifth-year decision deadline has passed'};
  o.decided=true;o.exercised=!!exercise;o.decidedYear=s.year;
@@ -243,7 +247,7 @@ function decideFifthYear(p,s,exercise,automatic=false){
 function seasonEnd(s){
  const changes=[];for(const p of s.players){
    const o=p.draftFifthYear;
-   if(!o||o.decided||o.deadlineYear!==s.year)continue;
+   if(!o||o.decided||o.deadlineYear!==s.year||p.team<0)continue;
    const exercise=p.rating>=CONFIG.fifthYear.exerciseMinRating;
    if(p.team===s.team){ // Automatic conservative fallback if user did not choose.
      const result=decideFifthYear(p,s,exercise,true);if(result.ok)changes.push({playerId:p.id,exercise,auto:true});
@@ -265,7 +269,7 @@ function page(s){
  return '<div class="eyebrow">DRAFT COMBINE & SCOUTING</div><h1 class="heading">THE EVALUATION LAB</h1>'+
  '<p class="sub">Seven rounds · '+(f.picks?.length||0)+' picks · '+(f.prospects?.length||0)+' prospects. Hidden true ratings are revealed only after selection.</p>'+
  '<div class="grid three"><div class="card"><h3>PRO DAY REVIEWS</h3><h2>'+r.proDays+'</h2></div>'+
- '<div class="card"><h3>PRIVATE WORKOUTS</h3><h2>'+r.privateWorkouts+'</h2></div>'+
+ '<div class="card"><h3>COMBINE REVIEWS</h3><h2>'+r.combineReview+'</h2></div>'+ '<div class="card"><h3>PRIVATE WORKOUTS</h3><h2>'+r.privateWorkouts+'</h2></div>'+
  '<div class="card"><h3>ON THE CLOCK</h3><h2>'+(current?'R'+current.round+' / '+current.slot:'COMPLETE')+'</h2></div></div>'+
  '<h2>PROSPECT EVALUATIONS</h2><div class="grid two">'+pool.slice().sort((a,b)=>estimated(b,s)-estimated(a,s)).slice(0,CONFIG.ui.display).map(p=>{
    const g=publicGrade(p,s),stats=g.combine;
