@@ -223,11 +223,11 @@ function rookieContract(p,s,round,slot){
  return c;
 }
 const roundMoney=n=>Math.round(n*100)/100;
-function decideFifthYear(p,s,exercise){
+function decideFifthYear(p,s,exercise,automatic=false){
  const o=p?.draftFifthYear;
  if(!o||o.decided)return {ok:false,error:'No available fifth-year option'};
  if(p.team!==s.team)return {ok:false,error:'Only your first-round picks can be managed'};
- if(s.year>o.deadlineYear||(s.year===o.deadlineYear&&s.week>o.deadlineWeek))
+ if(!automatic&&(s.year>o.deadlineYear||(s.year===o.deadlineYear&&s.week>o.deadlineWeek)))
    return {ok:false,error:'Fifth-year decision deadline has passed'};
  o.decided=true;o.exercised=!!exercise;o.decidedYear=s.year;
  if(exercise){
@@ -246,7 +246,7 @@ function seasonEnd(s){
    if(!o||o.decided||o.deadlineYear!==s.year)continue;
    const exercise=p.rating>=CONFIG.fifthYear.exerciseMinRating;
    if(p.team===s.team){ // Automatic conservative fallback if user did not choose.
-     const result=decideFifthYear(p,s,exercise);if(result.ok)changes.push({playerId:p.id,exercise,auto:true});
+     const result=decideFifthYear(p,s,exercise,true);if(result.ok)changes.push({playerId:p.id,exercise,auto:true});
    }else{
      o.decided=true;o.exercised=exercise;o.decidedYear=s.year;
      if(exercise){
