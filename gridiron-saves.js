@@ -31,7 +31,7 @@ function compare(slotId){
  };
  return {parentName:parent.name,yearDelta:childData.year-parentData.year,
    weekDelta:childData.week-parentData.week,
-   cashDelta:Math.round((childData.cash-parentData.cash)*10)/10,
+   cashDelta:Math.round(((Number(childData.cash)||0)-(Number(parentData.cash)||0))*10)/10,
    winsDelta:wins(childData)-wins(parentData),
    note:childData.year===parentData.year?'Same-season comparison':'Different seasons: win difference is not a like-for-like result'};
 }
