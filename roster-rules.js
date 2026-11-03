@@ -33,9 +33,9 @@ function move(p,s,type){
 }
 function validate(s,team){const c=count(s,team),issues=[];if(c.ACTIVE>53)issues.push('Active roster exceeds 53 players');if(c.PRACTICE>16)issues.push('Practice squad exceeds 16 players');return {ok:!issues.length,issues,counts:c}}
 function finalCuts(s,team){const check=validate(s,team);if(!check.ok)return check;s.rosterRules.finalCutsComplete[s.year+'-'+team]=true;return {ok:true,counts:check.counts}}
-function playable(p){return status(p)==='ACTIVE'&&Number(p.injury||0)<=0&&!p.contractAdvanced?.holdout}
+function playable(p){return (status(p)==='ACTIVE'||(status(p)==='PRACTICE'&&p.weeklyElevation?.active))&&Number(p.injury||0)<=0&&!p.contractAdvanced?.holdout}
 function lock(p,locked=true){if(!p)return false;p.depthLocked=!!locked;return true}
-function depth(s,team,pos){const ps=members(s,team,'ACTIVE').filter(p=>p.pos===pos),saved=s.franchiseSystems?.depthCharts?.[team]?.[pos]||[],order=new Map(saved.map((id,i)=>[String(id),i]));
+function depth(s,team,pos){const ps=[...members(s,team,'ACTIVE'),...members(s,team,'PRACTICE').filter(p=>p.weeklyElevation?.active)].filter(p=>p.pos===pos),saved=s.franchiseSystems?.depthCharts?.[team]?.[pos]||[],order=new Map(saved.map((id,i)=>[String(id),i]));
  const value=p=>p.rating-(p.fatigue||0)*.13+(p.form||0)*.9-(p.injury||0)*25;
  return ps.sort((a,b)=>Number(b.depthLocked)-Number(a.depthLocked)||(a.depthLocked&&b.depthLocked?(order.get(String(a.id))??999)-(order.get(String(b.id))??999):0)||value(b)-value(a));
 }
