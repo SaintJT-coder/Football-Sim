@@ -23,10 +23,10 @@ const club=t=>root.TEAMS?.[t]?.[1]||'Team '+t;
 const num=x=>Math.max(0,Number(x)||0);
 function init(s){
  const d=s.leagueNarratives??={version:1,headlines:[],processedGames:[],processedWeeks:[],
-   seasonRecords:{},careerRecords:{},franchiseRecords:{},gameRecords:{},
+   seasonRecords:{},allTimeSeasonRecords:{},careerRecords:{},franchiseRecords:{},gameRecords:{},
    recordEvents:[],honors:[]};
  for(const key of ['headlines','processedGames','processedWeeks','recordEvents','honors'])d[key]??=[];
- for(const key of ['seasonRecords','careerRecords','franchiseRecords','gameRecords'])d[key]??={};
+ for(const key of ['seasonRecords','allTimeSeasonRecords','careerRecords','franchiseRecords','gameRecords'])d[key]??={};
  return d;
 }
 function snap(s,g){
@@ -66,6 +66,7 @@ function afterGame(s,g,before){
      if(delta>0)p.careerStats[k]=num(p.careerStats[k])+delta;
      if(total>0){
        record(s,'seasonRecords',s.year+':'+k,total,p,'league season '+k);
+       record(s,'allTimeSeasonRecords',k,total,p,'all-time single-season '+k);
        record(s,'franchiseRecords',p.team+':'+k,total,p,'franchise season '+k);
      }
      if(delta>0)record(s,'gameRecords',k,delta,p,'single-game '+k);
@@ -154,7 +155,8 @@ function seasonEnd(s){
  if(existing)return existing;
  const result=ballot(s);
  result.storylines=d.headlines.filter(x=>x.year===s.year).slice(0,20);
- result.records=Object.values(d.seasonRecords).filter(x=>x.year===s.year);
+ result.records=[...Object.values(d.allTimeSeasonRecords).filter(x=>x.year===s.year),
+   ...Object.values(d.seasonRecords).filter(x=>x.year===s.year)];
  d.honors.unshift(result);d.honors=d.honors.slice(0,40);
  if(result.mvp)s.news?.unshift('MVP VOTING: '+result.mvp.name+
    ' of '+club(result.mvp.team)+' wins on statistics and team success.');
@@ -180,7 +182,12 @@ function page(s){
       latest.allPro.map(p=>'<p>'+esc(p.pos)+' · '+esc(p.name)+' · '+
         esc(club(p.team))+' · '+p.score+'</p>').join('')+'</div>':
       '<div class="card">Awards voting is finalized at the end of the season.</div>')+
-   '<h2>SINGLE-SEASON RECORDS</h2>'+(top(d.seasonRecords).map(recordRow).join('')||
+   '<h2>ALL-TIME SINGLE-SEASON RECORDS</h2>'+
+   (top(d.allTimeSeasonRecords).map(recordRow).join('')||
+     '<div class="card">No all-time records yet.</div>')+
+   '<h2>THIS SEASON LEADERS</h2>'+(top(Object.fromEntries(
+      Object.entries(d.seasonRecords).filter(([k,v])=>v.year===s.year)
+   )).map(recordRow).join('')||
       '<div class="card">No records yet.</div>')+
    '<h2>CAREER LEADERS</h2>'+(top(d.careerRecords).map(recordRow).join('')||
       '<div class="card">No records yet.</div>')+
