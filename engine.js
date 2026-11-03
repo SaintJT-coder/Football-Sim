@@ -109,8 +109,8 @@ function game(g){
   for(const p of roster(team).filter(p=>!window.GMRosterRules||GMRosterRules.playable(p))){
    const snaps=window.GMPlayerPersonality?.snapsThisWeek(p,state)??40;
    if(snaps<=0)continue;
-   p.stats.games++;p.fatigue=clamp((p.fatigue||0)+rand(5,14)+(window.GMPlayerPersonality?.usageFatigue(snaps)||0),0,100);
-   const injuryRisk=.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0)+(window.GMPlayerPersonality?.usageInjuryRisk(snaps)||0);
+   p.stats.games++;p.fatigue=clamp((p.fatigue||0)+rand(5,14)+(window.GMPlayerPersonality?.usageFatigue(snaps,p)||0),0,100);
+   const injuryRisk=.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0)+(window.GMPlayerPersonality?.usageInjuryRisk(snaps,p)||0);
    if(Number(p.injury)>0){if(!window.GMInjuries)p.injury--;continue}
    if(Math.random()<injuryRisk){if(window.GMInjuries){const injury=GMInjuries.randomInjury(p,state);if(injury.ok)state.news.unshift(p.name+' diagnosed with '+injury.injury.name+' ('+injury.injury.estimate+' estimated weeks)')}else{p.injury=rand(1,5);state.news.unshift(p.name+' suffered an injury ('+p.injury+' weeks)')}}
    p.morale=clamp(p.morale+(forPts>againstPts?rand(0,3):-rand(0,3)),15,100);
