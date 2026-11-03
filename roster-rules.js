@@ -37,7 +37,9 @@ function playable(p){return (status(p)==='ACTIVE'||(status(p)==='PRACTICE'&&p.we
 function lock(p,locked=true){if(!p)return false;p.depthLocked=!!locked;return true}
 function depth(s,team,pos){const ps=[...members(s,team,'ACTIVE'),...members(s,team,'PRACTICE').filter(p=>p.weeklyElevation?.active)].filter(p=>p.pos===pos),saved=s.franchiseSystems?.depthCharts?.[team]?.[pos]||[],order=new Map(saved.map((id,i)=>[String(id),i]));
  const value=p=>p.rating-(p.fatigue||0)*.13+(p.form||0)*.9-(p.injury||0)*25;
- return ps.sort((a,b)=>Number(b.depthLocked)-Number(a.depthLocked)||(a.depthLocked&&b.depthLocked?(order.get(String(a.id))??999)-(order.get(String(b.id))??999):0)||value(b)-value(a));
+ return ps.sort((a,b)=>Number(b.depthLocked)-Number(a.depthLocked)||
+ (order.size?(order.get(String(a.id))??999)-(order.get(String(b.id))??999):0)||
+ value(b)-value(a));
 }
 function pickValue(round,slot=16){const overall=(Math.max(1,round)-1)*32+clamp(slot,1,32);return Math.round(3000*Math.pow(overall,-.64))}
 function scarcity(s,team,pos){const count=members(s,team).filter(p=>p.pos===pos&&playable(p)).length,desired={QB:2,RB:3,WR:5,TE:3,OL:5,DL:5,LB:4,CB:4,S:3,K:1}[pos]||3;return clamp(1+(desired-count)*.08,.85,1.35)}
