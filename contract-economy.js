@@ -162,6 +162,13 @@ function extend(p,s,offer={}){
  const firstNewYear=Math.max(s.year,startYear);
  if(firstNewYear===s.year&&currentLimit.space<salary+prorated)
    return {ok:false,error:'Extension would exceed the current cap'};
+ // Prevent future-year contracts that are already projected to break the cap.
+ // Carryover for years not yet settled is deliberately excluded from this forecast.
+ for(let j=0;j<activeAdded;j++){
+   const year=startYear+j;
+   if(year>=s.year&&sheet(s,s.team,year).space<salary+prorated)
+     return {ok:false,error:'Projected '+year+' cap room is too low for this extension'};
+ }
  for(let j=0;j<activeAdded;j++){
    c.baseSalaries.push(salary);
    c.bonusProration.push(prorated);
