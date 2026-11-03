@@ -101,7 +101,7 @@ function game(g){
   const defense=roster(team).filter(p=>['DL','LB','CB','S'].includes(p.pos)&&!p.injury);
   distribute(defense,clamp(Math.round(50+noise(14)),35,75),'tackles',p=>p.rating);
   distribute(defense.filter(p=>['DL','LB'].includes(p.pos)),clamp(Math.round((35-againstPts)/12+noise(2)),0,5),'sacks',p=>p.rating);
-  for(const p of roster(team)){
+  for(const p of roster(team).filter(p=>!window.GMRosterRules||GMRosterRules.playable(p))){
    p.stats.games++;p.fatigue=clamp((p.fatigue||0)+rand(5,14),0,100);
    const injuryRisk=.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0);
    if(Number(p.injury)>0){p.injury--;continue}
@@ -119,6 +119,7 @@ function simulateV2(){
  const games=state.engine.schedule.filter(g=>g.week===state.week);
  window.GMContractsAdvanced?.weekly(state);
  window.GMCoaching?.weekly(state);
+ window.GMRosterRules?.weekly(state);
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
  if(!games.length){state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
