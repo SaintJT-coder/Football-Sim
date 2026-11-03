@@ -58,10 +58,11 @@ function unlock(p){
  const a=archetype(p),ability=a[3],def=ABILITIES[ability],rank=TRAITS.indexOf(d.trait);
  if(def&&p.rating>=def.min&&rank>=TRAITS.indexOf(def.trait)&&d.totalXP>=1200&&d.seasonGames>=3&&!d.abilities.includes(ability))d.abilities.push(ability);
 }
-function gainXP(p,amount){
+function gainXP(p,amount,s=root.Gridiron?.getState?.()){
  const d=ensure(p);if(!d)return 0;
  const multiplier=[1,1.25,1.5,1.75][TRAITS.indexOf(d.trait)]||1;
- const xp=Math.max(0,Math.round(amount*multiplier*(p.morale>=80?1.08:1)));
+ const personality=root.GMPlayerPersonality?.xpMultiplier(p,s)??1;
+ const xp=Math.max(0,Math.round(amount*multiplier*personality*(p.morale>=80?1.08:1)));
  d.xp+=xp;d.totalXP+=xp;
  let levels=0;
  while(d.xp>=threshold(p)&&levels<3&&p.rating<p.pot){
@@ -80,7 +81,7 @@ function performanceXP(p,before){
  const base=45+Math.min(90,diff('passYards')*.13+diff('passTD')*22+diff('rushYards')*.24+diff('receivingYards')*.24+diff('tackles')*2+diff('sacks')*18+diff('receptions')*2);
  return Math.round(base);
 }
-function gameXP(p,before,played){const d=ensure(p);if(!d||!played||p.injury>0)return 0;d.seasonGames++;d.seasonMilestones.games=(d.seasonMilestones.games||0)+1;return gainXP(p,performanceXP(p,before))}
+function gameXP(p,before,played,s){const d=ensure(p);if(!d||!played)return 0;d.seasonGames++;d.seasonMilestones.games=(d.seasonMilestones.games||0)+1;return gainXP(p,performanceXP(p,before),s)}
 function budget(s){s.playerTraining??={year:s.year,week:s.week,points:12,allocations:[]};const b=s.playerTraining;if(b.year!==s.year||b.week!==s.week){b.year=s.year;b.week=s.week;b.points=12;b.allocations=[]}return b}
 function train(p,attribute,s,ai=false){
  const d=ensure(p);if(!d||!DRILLS[p.pos].includes(attribute))return {ok:false,reason:'Invalid drill'};
@@ -90,7 +91,7 @@ function train(p,attribute,s,ai=false){
  const times=d.drillCounts[attribute]||0,ar=archetype(p),fit=ar[1].includes(attribute)?1.35:1;
  const fatigue=clamp(p.fatigue||0,0,100),diminish=1/(1+times*.3);
  const xp=Math.round(115*fit*diminish*(1-fatigue*.004));
- const gained=gainXP(p,xp);
+ const gained=gainXP(p,xp,s);
  d.drillCounts[attribute]=times+1;
  p.fatigue=clamp(fatigue+4,0,100);
  if(p.attributes&&p.rating<p.pot&&times%3===0)p.attributes[attribute]=clamp((p.attributes[attribute]||p.rating)+1,1,99);
@@ -103,8 +104,8 @@ function weekly(s,before){
  budget(s);
  for(const p of s.players){
   const was=before?.get(p.id);
-  if(was)gameXP(p,was,true);
-  else if(p.team>=0&&p.injury<=0)gainXP(p,15);
+  if(was&&(root.GMPlayerPersonality?.snapsThisWeek(p,s)??1)>0)gameXP(p,was,true,s);
+  else if(p.team>=0&&p.injury<=0)gainXP(p,15,s);
   if(p.team>=0&&p.team!==s.team&&p.injury<=0&&Math.random()<.17){
    const drills=DRILLS[p.pos];train(p,drills[Math.floor(Math.random()*drills.length)],s,true);
   }
@@ -135,7 +136,7 @@ function aging(p){
 }
 function page(s){
  const b=budget(s),players=s.players.filter(p=>p.team===s.team),safe=v=>String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
- return '<div class="eyebrow">PLAYER DEVELOPMENT</div><h1 class="heading">TRAINING LAB</h1><p class="sub">Weekly points remaining: '+b.points+' / 12 · Each drill costs 2 points and adds fatigue.</p><div class="grid two">'+players.map(p=>{const d=ensure(p),a=archetype(p);return '<div class="card"><div class="row"><h3>'+safe(p.name)+'</h3><b>'+p.rating+' OVR</b></div><p class="muted">'+p.pos+' · '+safe(d.archetype)+' · '+safe(d.trait)+' · Potential '+p.pot+'</p><p>XP '+d.xp+' / '+threshold(p)+' · Fatigue '+Math.round(p.fatigue||0)+'% · '+safe(d.abilities.join(', ')||'No abilities unlocked')+'</p><div class="filters">'+DRILLS[p.pos].map(k=>'<button onclick="gmTrainPlayer('+p.id+',\''+k+'\')">'+safe(k.replace(/([A-Z])/g,' $1'))+' · 2 TP</button>').join('')+'</div></div>'}).join('')+'</div>';
+ return '<div class="eyebrow">PLAYER DEVELOPMENT</div><h1 class="heading">TRAINING LAB</h1><p class="sub">Weekly points remaining: '+b.points+' / 12 · Each drill costs 2 points and adds fatigue.</p><div class="grid two">'+players.map(p=>{const d=ensure(p),a=archetype(p),ident=root.GMPlayerPersonality?.ensure(p);return '<div class="card"><div class="row"><h3>'+safe(p.name)+'</h3><b>'+p.rating+' OVR</b></div><p class="muted">'+p.pos+' · '+safe(d.archetype)+' · '+safe(d.trait)+' · Potential '+p.pot+'</p>'+(ident?'<p>'+safe(ident.playStyle)+' · '+safe(ident.traits.join(' / '))+' · '+(ident.snaps.last?.count||0)+' snaps last game</p>':'')+'<p>XP '+d.xp+' / '+threshold(p)+' · Fatigue '+Math.round(p.fatigue||0)+'% · '+safe(d.abilities.join(', ')||'No abilities unlocked')+'</p><div class="filters">'+DRILLS[p.pos].map(k=>'<button onclick="gmTrainPlayer('+p.id+',\''+k+'\')">'+safe(k.replace(/([A-Z])/g,' $1'))+' · 2 TP</button>').join('')+'</div></div>'}).join('')+'</div>';
 }
 root.GMDevelopment={ARCHETYPES,ABILITIES,PEAK,DRILLS,ensure,archetype,schemeBonus,gainXP,gameXP,weekly,train,budget,abilityBoost,aging,page,unlock};
 root.gmTrainPlayer=function(id,attribute){const p=state.players.find(p=>p.id===id),result=GMDevelopment.train(p,attribute,state);if(!result.ok)alert(result.reason);save();render()};
