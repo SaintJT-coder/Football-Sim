@@ -62,12 +62,14 @@ function buildReport(g,context,teamLines){
 function game(g){
  const a=scoreTeam(g.a),b=scoreTeam(g.b);
  const staffBonus=(team,role)=>team===state.team?((Number(state.staff?.[role]?.rating)||70)-70)*.06:0;
- a.off+=staffBonus(g.a,'offensiveCoordinator');a.def+=staffBonus(g.a,'defensiveCoordinator');
- b.off+=staffBonus(g.b,'offensiveCoordinator');b.def+=staffBonus(g.b,'defensiveCoordinator');
+ const coach=window.GMCoaching?.gamePlan(state);
+ a.off+=staffBonus(g.a,'offensiveCoordinator')+(g.a===state.team?(coach?.offSynergy||0)*.3:0);a.def+=staffBonus(g.a,'defensiveCoordinator')+(g.a===state.team?(coach?.defSynergy||0)*.3:0);
+ b.off+=staffBonus(g.b,'offensiveCoordinator')+(g.b===state.team?(coach?.offSynergy||0)*.3:0);b.def+=staffBonus(g.b,'defensiveCoordinator')+(g.b===state.team?(coach?.defSynergy||0)*.3:0);
  const context=gameContext(g),weather=context.weather;
  const weatherPenalty=weather==='Rain'?-1:weather==='Snow'?-3:weather==='Wind'?-2:weather==='Extreme Cold'?-2:0;
  const boost=t=>{const ps=roster(t).filter(p=>p.injury<=0).slice(0,12);return ps.length?ps.reduce((v,p)=>v+(window.GMDevelopment?.abilityBoost(p,{playType:'pass',scheme:window.GMFranchise?.scheme(state,t,'offense')})||0),0)/ps.length:0};
  a.off*=1+boost(g.a);b.off*=1+boost(g.b);
+ if(coach){const apply=(own,other)=>{if(own===state.team){const delta=(coach.blitz-35)*.04;other.off-=delta;if(coach.redZone==='Aggressive')return 1.5;if(coach.redZone==='Run'||coach.redZone==='Pass')return .5}return 0};a.off+=apply(g.a,b);b.off+=apply(g.b,a)}
  const sa=clamp(points(a.off,b.def,true)+Math.round(context.homeField-1.5)+context.homeStreak+weatherPenalty,0,56),sb=clamp(points(b.off,a.def,false)+context.awayStreak+weatherPenalty,0,56);
  const teamLines=[];
  g.sa=sa===sb?sa+3:sa;g.sb=sb;g.year=state.year;
@@ -77,7 +79,8 @@ function game(g){
   const gamePlan=team===state.team?state.gameplay||{}:{};
   const bias=(scheme==='Air Raid'?.13:scheme==='Power Run'?-.13:scheme==='Spread Option'?.06:0)+(gamePlan.offense==='PASS HEAVY'?.10:gamePlan.offense==='RUN HEAVY'?-.10:0);
   const script=forPts<againstPts?.05:-.03;
-  const passShare=clamp(.53+bias+script+(scoreTeam(team).off-scoreTeam(team).def)*.002+noise(.1),.31,.81);
+  const coachingBias=team===state.team&&coach?(coach.passShare-.53):0;
+ const passShare=clamp(.53+coachingBias+bias+script+(scoreTeam(team).off-scoreTeam(team).def)*.002+noise(.1),.31,.81);
   const totalYards=clamp(Math.round(290+(forPts-21)*5+noise(95)+(weather==='Snow'?-35:weather==='Wind'?-15:0)+(gamePlan.tempo==='AGGRESSIVE'?15:gamePlan.tempo==='CONSERVATIVE'?-12:0)),120,590);
   const passYards=Math.round(totalYards*passShare),rushYards=totalYards-passYards;
   const tds=Math.min(7,Math.floor(forPts/7));
@@ -115,6 +118,7 @@ function simulateV2(){
  if(state.week>18){endSeasonV2();return}
  const games=state.engine.schedule.filter(g=>g.week===state.week);
  window.GMContractsAdvanced?.weekly(state);
+ window.GMCoaching?.weekly(state);
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
  if(!games.length){state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
