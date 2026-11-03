@@ -78,8 +78,8 @@ function factors(p,s){
  const philosophy=p.team===s?.team?s?.coachingPhilosophy?.headCoach:'Balanced';
  const coach=CONFIG.philosophies[philosophy]||CONFIG.philosophies.Balanced;
  const fit=schemeFit(p,s),fitXP=1+(fit-CONFIG.xp.fitCenter)*CONFIG.xp.fitPerPoint;
- const usage=d.snaps.last?.year===s?.year&&d.snaps.last?.week===s?.week
-   ?Math.min(CONFIG.usage.maxXpBonus,Math.max(0,d.snaps.last.count-(CONFIG.usage.thresholds[p.pos]??CONFIG.usage.highSnaps))*CONFIG.usage.xpPerSnap):0;
+ const usage=d.snaps.last&&s&&d.snaps.last.year===s.year&&d.snaps.last.week===s.week
+   ?Math.min(CONFIG.usage.maxXpBonus,Math.max(0,(d.snaps.last.count||0)-(CONFIG.usage.thresholds[p.pos]??CONFIG.usage.highSnaps))*CONFIG.usage.xpPerSnap):0;
  const xp=clamp(traits.reduce((n,t)=>n*t.xp,coach.xp)*fitXP*(1+usage),CONFIG.xp.min,CONFIG.xp.max);
  const morale=clamp(traits.reduce((n,t)=>n+t.morale,0)+coach.morale+
    (fit>=CONFIG.morale.positiveFit?1:fit<=CONFIG.morale.negativeFit?-1:0),
