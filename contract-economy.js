@@ -445,8 +445,12 @@ root.gmEconomyOption=id=>{
  const p=state.players.find(p=>String(p.id)===String(id));if(!p)return;
  const c=ensureContract(p,state),o=c.options.find(o=>!o.decided&&o.holder==='TEAM');
  if(!o){alert('No undecided team option. Player options are automatic at the deadline.');return}
- const yes=confirm('Exercise '+p.name+' team option for '+o.year+' at $'+o.salary+'M? Cancel declines it.');
- execResult(()=>setOption(p,state,o.year,yes));
+ const decision=prompt('Team option for '+p.name+' in '+o.year+' at $'+o.salary+
+   'M: enter EXERCISE or DECLINE. Cancel to leave unchanged.','EXERCISE');
+ if(decision===null)return;
+ const choice=decision.trim().toUpperCase();
+ if(!['EXERCISE','DECLINE'].includes(choice)){alert('Choose EXERCISE or DECLINE');return}
+ execResult(()=>setOption(p,state,o.year,choice==='EXERCISE'));
 };
 root.gmEconomyLadder=id=>{
  const p=state.players.find(p=>String(p.id)===String(id));if(!p)return;
