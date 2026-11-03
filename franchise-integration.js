@@ -18,6 +18,7 @@ function depthPage(){
 }
 window.gmMoveDepth=(pos,i,d)=>{let ids=GMFranchise.depth(state,state.team,pos).map(p=>p.id),j=i+d;if(j<0||j>=ids.length)return;[ids[i],ids[j]]=[ids[j],ids[i]];GMFranchise.setDepth(state,state.team,pos,ids);save();render()};
 window.gmSetScheme=(side,value)=>{init();if(!(side==='offense'?GMFranchise.OFF:GMFranchise.DEF).includes(value))return;state.franchiseSystems.schemes[state.team]??={};state.franchiseSystems.schemes[state.team][side]=value;save();render()};
+function staffPage(){init();return title('Coaching Staff','Manage your coaching staff and see how coordinators influence game performance.','FRONT OFFICE')+'<div class="grid two">'+Object.entries(state.staff).map(([role,p])=>'<div class="card"><h3>'+esc(role.replace(/([A-Z])/g,' $1'))+'</h3><p>'+esc(p.name)+'</p><p>Rating: '+p.rating+'/99</p><p class="muted small">Coordinator ratings affect offensive and defensive performance.</p></div>').join('')+'</div>'}
 function combine(p){
  init();let cache=state.draftPolish.combine;if(cache[p.id])return cache[p.id];
  const athletic=clamp(Number(p.athletic)||p.rating||65,35,99),n=(a,b)=>a+Math.random()*(b-a);
@@ -32,8 +33,9 @@ function scoutPage(){
 }
 window.gmFocus=value=>{state.draftPolish.focus=value;save();render()};
 const oldRender=render;
-render=function(){init();if(page==='Depth Chart'||page==='Combine'){nav();$('mobileSeason').textContent=state.year+' W'+state.week;$('app').innerHTML=page==='Depth Chart'?depthPage():scoutPage();return}oldRender()};
+render=function(){init();if(page==='Depth Chart'||page==='Combine'||page==='Coaching Staff'){nav();$('mobileSeason').textContent=state.year+' W'+state.week;$('app').innerHTML=page==='Depth Chart'?depthPage():page==='Coaching Staff'?staffPage():scoutPage();return}oldRender()};
 const i=pages.indexOf('Roster');if(i>=0&&!pages.includes('Depth Chart'))pages.splice(i+1,0,'Depth Chart');
+const o=pages.indexOf('Front Office');if(o>=0&&!pages.includes('Coaching Staff'))pages.splice(o+1,0,'Coaching Staff');
 const s=pages.indexOf('Scouting');if(s>=0&&!pages.includes('Combine'))pages.splice(s+1,0,'Combine');
 init();render();
 })();
