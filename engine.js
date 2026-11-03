@@ -127,9 +127,10 @@ function simulateV2(){
  window.GMRosterRules?.weekly(state);
  window.GMInjuries?.weekly(state);
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
- if(!games.length){window.GMOwner?.weekly(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
+ if(!games.length){window.Gridiron?.emit('week:bye',{state,year:state.year,week:state.week});window.GMOwner?.weekly(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
  for(const g of games){const result=game({...g});state.results.push(result);window.GMSimPresentation?.report(state,result)}
+ window.Gridiron?.emit('week:games-complete',{state,year:state.year,week:state.week,games:state.results.filter(g=>g.year===state.year&&g.week===state.week)});
  window.GMDevelopment?.weekly(state,devBefore);
  if(window.GMContractsAdvanced)for(const p of state.players.filter(x=>x.team>=0))GMContractsAdvanced.incentiveCheck(p,state,{teamWins:record(p.team).w});
  for(const p of state.players){
@@ -182,6 +183,7 @@ function endSeasonV2(){
  state.awards.push({year:state.year,mvp:mvp?.name||'—'});
  window.GMOwner?.seasonEnd(state,{champion:champ===state.team,playoffs:playoffs.some(g=>g.a===state.team||g.b===state.team),division:seeded.some(c=>c[0]?.i===state.team)});
  window.GMSeasonRecap?.generate(state,standings,playoffs,state.awards);
+ window.Gridiron?.emit('season:complete',{state,year:state.year,champion:champ,playoffs});
  state.engine.playoffs=playoffs;state.engine.playoffYear=state.year;state.engine.awards.push(state.awards.at(-1));
  window.GMContractsAdvanced?.season(state,Object.fromEntries(TEAMS.map((_,i)=>[i,{teamWins:record(i).w,playoffs:playoffs.some(g=>g.a===i||g.b===i)}])));
  for(const p of state.players){
