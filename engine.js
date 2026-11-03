@@ -67,6 +67,9 @@ function buildReport(g,context,teamLines){
 }
 function game(g){
  const a=scoreTeam(g.a),b=scoreTeam(g.b);
+ const staffBonus=(team,role)=>team===state.team?((Number(state.staff?.[role]?.rating)||70)-70)*.06:0;
+ a.off+=staffBonus(g.a,'offensiveCoordinator');a.def+=staffBonus(g.a,'defensiveCoordinator');
+ b.off+=staffBonus(g.b,'offensiveCoordinator');b.def+=staffBonus(g.b,'defensiveCoordinator');
  const context=gameContext(g),weather=context.weather;
  const weatherPenalty=weather==='Rain'?-1:weather==='Snow'?-3:weather==='Wind'?-2:weather==='Extreme Cold'?-2:0;
  const sa=clamp(points(a.off,b.def,true)+Math.round(context.homeField-1.5)+context.homeStreak+weatherPenalty,0,56),sb=clamp(points(b.off,a.def,false)+context.awayStreak+weatherPenalty,0,56);
@@ -75,12 +78,14 @@ function game(g){
  for(const [team,forPts,againstPts] of [[g.a,g.sa,g.sb],[g.b,g.sb,g.sa]]){
   const q=depth(team,'QB')[0],rbs=depth(team,'RB',3),receivers=[...depth(team,'WR',4),...depth(team,'TE',2)];
   const scheme=window.GMFranchise?.scheme(state,team,'offense');
-  const bias=scheme==='Air Raid'?.13:scheme==='Power Run'?-.13:scheme==='Spread Option'?.06:0;
+  const gamePlan=team===state.team?state.gameplay||{}:{};
+  const bias=(scheme==='Air Raid'?.13:scheme==='Power Run'?-.13:scheme==='Spread Option'?.06:0)+(gamePlan.offense==='PASS HEAVY'?.10:gamePlan.offense==='RUN HEAVY'?-.10:0);
   const script=forPts<againstPts?.05:-.03;
   const passShare=clamp(.53+bias+script+(scoreTeam(team).off-scoreTeam(team).def)*.002+noise(.1),.31,.81);
-  const totalYards=clamp(Math.round(290+(forPts-21)*5+noise(95)+(weather==='Snow'?-35:weather==='Wind'?-15:0)),120,590);
+  const totalYards=clamp(Math.round(290+(forPts-21)*5+noise(95)+(weather==='Snow'?-35:weather==='Wind'?-15:0)+(gamePlan.tempo==='AGGRESSIVE'?15:gamePlan.tempo==='CONSERVATIVE'?-12:0)),120,590);
   const passYards=Math.round(totalYards*passShare),rushYards=totalYards-passYards;
   const tds=Math.min(7,Math.floor(forPts/7));
+  const previousInts=q?(q.stats.interceptions||0):0;
   if(q){let attempts=clamp(Math.round(30+(passShare-.53)*35+noise(12)),16,52),completion=clamp(.49+(q.rating-60)*.004+noise(.12)+(weather==='Rain'?-.035:weather==='Snow'?-.065:weather==='Wind'?-.045:0),.35,.79);
    q.stats.attempts+=attempts;q.stats.completions+=Math.round(attempts*completion);
    q.stats.passYards+=passYards;q.stats.passTD+=Math.max(0,Math.round(tds*passShare));
@@ -92,7 +97,8 @@ function game(g){
   distribute(receivers,Math.round(passYards/12),'receptions',p=>Math.max(1,p.rating-48));
   distribute(rbs,Math.max(0,tds-Math.round(tds*passShare)),'rushTD',p=>Math.max(1,p.rating-48));
   for(const p of [...rbs,...receivers]){p.stats.yards=(p.stats.rushYards||0)+(p.stats.receivingYards||0);p.stats.td=(p.stats.rushTD||0)+(p.stats.recTD||0)}
-  teamLines.push({team,points:forPts,totalYards,passYards,rushYards,passShare:+passShare.toFixed(2),thirdDownAttempts:rand(9,16),turnovers:q?Math.max(0,(q.stats.interceptions||0)):0});
+  const thirdDownAttempts=rand(9,16),thirdDownConversions=clamp(Math.round(thirdDownAttempts*(.32+(scoreTeam(team).off-65)*.003+noise(.08))),0,thirdDownAttempts);
+  teamLines.push({team,points:forPts,totalYards,passYards,rushYards,passShare:+passShare.toFixed(2),thirdDownAttempts,thirdDownConversions,turnovers:q?Math.max(0,(q.stats.interceptions||0)-previousInts):0});
   const defense=roster(team).filter(p=>['DL','LB','CB','S'].includes(p.pos)&&!p.injury);
   distribute(defense,clamp(Math.round(50+noise(14)),35,75),'tackles',p=>p.rating);
   distribute(defense.filter(p=>['DL','LB'].includes(p.pos)),clamp(Math.round((35-againstPts)/12+noise(2)),0,5),'sacks',p=>p.rating);
