@@ -4,7 +4,7 @@ const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
 const avg=(xs)=>xs.length?xs.reduce((s,n)=>s+n,0)/xs.length:0;
 const pick=(xs)=>xs[Math.floor(Math.random()*xs.length)];
 const depth=(team,pos,n=1)=>roster(team).filter(p=>p.pos===pos&&!(Number(p.injury)>0)).sort((a,b)=>b.rating-a.rating).slice(0,n);
-const scoreTeam=(team)=>{
+const scoreTeam=(team)=>{ if(window.GMFranchise){const x=GMFranchise.score(state,team);return {off:x.offense,def:x.defense,spec:x.special};}
  const unit=(positions)=>avg(positions.flatMap(([pos,n])=>depth(team,pos,n).map(p=>p.rating*(1-(p.fatigue||0)*.003)+((p.morale??65)-65)*.06)));
  const off=unit([['QB',1],['RB',1],['WR',3],['TE',1],['OL',5]]);
  const def=unit([['DL',3],['LB',3],['CB',2],['S',2]]);
@@ -30,6 +30,7 @@ const freshSchedule=()=>{
  return weeks.flat();
 };
 function setup(){
+ window.GMFranchise?.init(state);
  state.engine??={version:2,season:state.year,schedule:freshSchedule(),career:{},awards:[],playoffs:[],log:[]};
  let e=state.engine;
  if(e.season!==state.year){e.season=state.year;e.schedule=freshSchedule()}
