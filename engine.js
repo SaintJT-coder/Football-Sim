@@ -200,7 +200,9 @@ function endSeasonV2(){
  window.GMSeasonRecap?.generate(state,standings,playoffs,state.awards);
  window.Gridiron?.emit('season:complete',{state,year:state.year,champion:champ,playoffs});
  state.engine.playoffs=playoffs;state.engine.playoffYear=state.year;state.engine.awards.push(state.awards.at(-1));
- window.GMContractsAdvanced?.season(state,Object.fromEntries(TEAMS.map((_,i)=>[i,{teamWins:record(i).w,playoffs:playoffs.some(g=>g.a===i||g.b===i)}])));
+ const contractContext=Object.fromEntries(TEAMS.map((_,i)=>[i,{teamWins:record(i).w,playoffs:playoffs.some(g=>g.a===i||g.b===i)}]));
+ window.GMContractsAdvanced?.season(state,contractContext);
+ window.GMContractEconomy?.seasonEnd(state,contractContext);
  for(const p of state.players){
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
   if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){const retired={...p,retiredYear:state.year};state.retired.push(retired);window.GMSimPresentation?.retirement(state,retired);p.team=-2}
@@ -210,6 +212,7 @@ function endSeasonV2(){
  }
  window.GMSimPresentation?.season(state);
  state.year++;state.week=1;state.results=[];
+ window.GMContractEconomy?.advanceYear(state);
  window.GMOwner?.nextSeason(state);state.cash+=35;state.deadCap=0;
  state.engine.season=state.year;state.engine.schedule=freshSchedule();
  state.news.unshift(TEAMS[champ][1]+' won the '+(state.year-1)+' championship!');
