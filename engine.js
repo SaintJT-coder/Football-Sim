@@ -139,7 +139,7 @@ function simulateV2(){
  window.GMRosterRules?.weekly(state);
  window.GMInjuries?.weekly(state);
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
- if(!games.length){window.Gridiron?.emit('week:bye',{state,year:state.year,week:state.week});window.GMWeeklyGameplan?.finishWeek(state,devBefore);window.GMOwner?.weekly(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
+ if(!games.length){window.Gridiron?.emit('week:bye',{state,year:state.year,week:state.week});window.GMWeeklyGameplan?.finishWeek(state,devBefore);window.GMOwner?.weekly(state);window.GMImmersion?.afterWeek(state);state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
  for(const g of games){const beforeGame=window.GMLeagueNarratives?.snap(state,g);const result=game({...g});state.results.push(result);window.GMSimPresentation?.report(state,result);window.GMLeagueNarratives?.afterGame(state,result,beforeGame)}
  window.GMLeagueNarratives?.weekly(state);
@@ -157,6 +157,7 @@ function simulateV2(){
  window.GMOwner?.weekly(state);
  const rec=record(state.team);e.jobSecurity=clamp((e.jobSecurity??60)+(rec.w>=rec.l?2:-2),0,100);
  state.cash+=rand(2,8);state.news.unshift('Week '+state.week+' complete: '+rec.w+'-'+rec.l+' season record');
+ window.GMImmersion?.afterWeek(state);
  state.week++;selectedWeek=state.week;save();render();
 }
 function endSeasonV2(){
