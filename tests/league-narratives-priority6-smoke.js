@@ -21,7 +21,7 @@ const state={year:2026,week:6,team:0,players,results:[],news:[],
 const scope={TEAMS,state,window:null,console,Math,JSON,
  Gridiron:{register:()=>{}},
  GMOwner:{init:s=>s.ownerFranchise},
- save:()=>{},render:()=>{},alert:message=>{throw Error(message)},
+ save:()=>{},render:()=>{scope.GMRelocation?.applyTeamIdentity(state)},alert:message=>{throw Error(message)},
  confirm:()=>true};
 scope.window=scope;vm.createContext(scope);
 function load(filename){
