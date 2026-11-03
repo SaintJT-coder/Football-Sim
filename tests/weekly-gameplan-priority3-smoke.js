@@ -29,7 +29,7 @@ assert.equal(ops.set(state,'offense','Aggressive').ok,true);
 assert.equal(ops.set(state,'defense','Aggressive').ok,true);
 assert.equal(ops.set(state,'target','Secondary').ok,true);
 assert.equal(ops.set(state,'passRatio',999).ok,false);
-const p=state.players.find(p=>p.team===0&&p.pos==='QB');
+const p=roster.depth(state,0,'QB')[0];
 const budget=dev.budget(state),start=budget.points;
 assert.equal(ops.focus(state,p.id,'TECHNIQUE').ok,true);
 assert.equal(budget.points,start-ops.CONFIG.focus.cost);
