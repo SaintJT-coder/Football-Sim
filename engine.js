@@ -61,10 +61,12 @@ function buildReport(g,context,teamLines){
 }
 function game(g){
  const a=scoreTeam(g.a),b=scoreTeam(g.b);
- const staffBonus=(team,role)=>team===state.team?((Number(state.staff?.[role]?.rating)||70)-70)*.06:0;
+ const staffBonus=(team,role)=>window.GMStaff?.gameModifier(state,team,role)??0;
  const coach=window.GMCoaching?.gamePlan(state);
- a.off+=staffBonus(g.a,'offensiveCoordinator')+(g.a===state.team?(coach?.offSynergy||0)*.3:0);a.def+=staffBonus(g.a,'defensiveCoordinator')+(g.a===state.team?(coach?.defSynergy||0)*.3:0);
- b.off+=staffBonus(g.b,'offensiveCoordinator')+(g.b===state.team?(coach?.offSynergy||0)*.3:0);b.def+=staffBonus(g.b,'defensiveCoordinator')+(g.b===state.team?(coach?.defSynergy||0)*.3:0);
+ a.off+=staffBonus(g.a,'offense')+staffBonus(g.a,'special')*.2+(g.a===state.team?(coach?.offSynergy||0)*.3:0);
+ a.def+=staffBonus(g.a,'defense')+(g.a===state.team?(coach?.defSynergy||0)*.3:0);
+ b.off+=staffBonus(g.b,'offense')+staffBonus(g.b,'special')*.2+(g.b===state.team?(coach?.offSynergy||0)*.3:0);
+ b.def+=staffBonus(g.b,'defense')+(g.b===state.team?(coach?.defSynergy||0)*.3:0);
  const context=gameContext(g),weather=context.weather;
  const rivalry=window.GMSimPresentation?.pregameBoost(state,g,g.a)||0;
  const rivalryB=window.GMSimPresentation?.pregameBoost(state,g,g.b)||0;
@@ -110,7 +112,7 @@ function game(g){
    const snaps=window.GMPlayerPersonality?.snapsThisWeek(p,state)??40;
    if(snaps<=0)continue;
    p.stats.games++;p.fatigue=clamp((p.fatigue||0)+rand(5,14)+(window.GMPlayerPersonality?.usageFatigue(snaps,p)||0),0,100);
-   const injuryRisk=.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0)+(window.GMPlayerPersonality?.usageInjuryRisk(snaps,p)||0);
+   const injuryRisk=(.003+Math.max(0,p.fatigue-45)*.00022+(p.age>31?.002:0)+(window.GMPlayerPersonality?.usageInjuryRisk(snaps,p)||0))*(window.GMStaff?.conditioning(p,state).injuryMultiplier??1);
    if(Number(p.injury)>0){if(!window.GMInjuries)p.injury--;continue}
    if(Math.random()<injuryRisk){if(window.GMInjuries){const injury=GMInjuries.randomInjury(p,state);if(injury.ok)state.news.unshift(p.name+' diagnosed with '+injury.injury.name+' ('+injury.injury.estimate+' estimated weeks)')}else{p.injury=rand(1,5);state.news.unshift(p.name+' suffered an injury ('+p.injury+' weeks)')}}
    p.morale=clamp(p.morale+(forPts>againstPts?rand(0,3):-rand(0,3)),15,100);
@@ -126,6 +128,7 @@ function simulateV2(){
  if(window.GMRosterRules){const check=GMRosterRules.validate(state,state.team);if(!check.ok){alert(check.issues.join(', '));return}}
  const games=state.engine.schedule.filter(g=>g.week===state.week);
  window.GMContractsAdvanced?.weekly(state);
+ window.GMStaff?.weekly(state);
  window.GMCoaching?.weekly(state);
  window.GMPlayerPersonality?.weeklyMorale(state);
  window.GMRosterRules?.weekly(state);
@@ -139,7 +142,7 @@ function simulateV2(){
  window.GMPlayerPersonality?.midseason(state);
  if(window.GMContractsAdvanced)for(const p of state.players.filter(x=>x.team>=0))GMContractsAdvanced.incentiveCheck(p,state,{teamWins:record(p.team).w});
  for(const p of state.players){
-  const recovery=(plan==='Recovery'?18:plan==='Development'?7:12)+(window.GMOwner?.modifiers(state).fatigueRecovery||0);
+  const recovery=(plan==='Recovery'?18:plan==='Development'?7:12)+(window.GMOwner?.modifiers(state).fatigueRecovery||0)+(window.GMStaff?.conditioning(p,state).fatigueRecovery||0);
   p.fatigue=clamp(p.fatigue-recovery+(intensity==='High'?5:intensity==='Low'?-5:0),0,100);
   if(!window.GMDevelopment&&p.age<29&&p.rating<p.pot&&p.development>=5){p.rating++;p.development-=5}
  }
@@ -187,6 +190,7 @@ function endSeasonV2(){
  const mvp=[...state.players].filter(p=>p.pos==='QB').sort((a,b)=>(b.stats.passYards+b.stats.passTD*20-b.stats.interceptions*35)-(a.stats.passYards+a.stats.passTD*20-a.stats.interceptions*35))[0];
  state.awards.push({year:state.year,mvp:mvp?.name||'—'});
  window.GMOwner?.seasonEnd(state,{champion:champ===state.team,playoffs:playoffs.some(g=>g.a===state.team||g.b===state.team),division:seeded.some(c=>c[0]?.i===state.team)});
+ window.GMStaff?.seasonEnd(state);
  window.GMSeasonRecap?.generate(state,standings,playoffs,state.awards);
  window.Gridiron?.emit('season:complete',{state,year:state.year,champion:champ,playoffs});
  state.engine.playoffs=playoffs;state.engine.playoffYear=state.year;state.engine.awards.push(state.awards.at(-1));
