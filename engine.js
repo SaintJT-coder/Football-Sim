@@ -114,11 +114,13 @@ function simulateV2(){
  setup();
  if(state.week>18){endSeasonV2();return}
  const games=state.engine.schedule.filter(g=>g.week===state.week);
+ window.GMContractsAdvanced?.weekly(state);
  const devBefore=new Map(state.players.filter(p=>p.team>=0).map(p=>[p.id,{...p.stats}]));
  if(!games.length){state.news.unshift('League-wide bye week complete.');state.week++;selectedWeek=state.week;save();render();return}
  const e=extraStore(),plan=e.plan||'Game Week',intensity=e.intensity||'Normal';
  for(const g of games){const result=game({...g});state.results.push(result)}
  window.GMDevelopment?.weekly(state,devBefore);
+ if(window.GMContractsAdvanced)for(const p of state.players.filter(x=>x.team>=0))GMContractsAdvanced.incentiveCheck(p,state,{teamWins:record(p.team).w});
  for(const p of state.players){
   const recovery=plan==='Recovery'?18:plan==='Development'?7:12;
   p.fatigue=clamp(p.fatigue-recovery+(intensity==='High'?5:intensity==='Low'?-5:0),0,100);
@@ -167,6 +169,7 @@ function endSeasonV2(){
  const mvp=[...state.players].filter(p=>p.pos==='QB').sort((a,b)=>(b.stats.passYards+b.stats.passTD*20-b.stats.interceptions*35)-(a.stats.passYards+a.stats.passTD*20-a.stats.interceptions*35))[0];
  state.awards.push({year:state.year,mvp:mvp?.name||'—'});
  state.engine.playoffs=playoffs;state.engine.playoffYear=state.year;state.engine.awards.push(state.awards.at(-1));
+ window.GMContractsAdvanced?.season(state,Object.fromEntries(TEAMS.map((_,i)=>[i,{teamWins:record(i).w,playoffs:playoffs.some(g=>g.a===i||g.b===i)}])));
  for(const p of state.players){
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
   if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){state.retired.push({...p,retiredYear:state.year});p.team=-2}
