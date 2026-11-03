@@ -133,7 +133,8 @@ function ballot(s){
    const success=teamRecord(s,p.team).pct;
    const total=100*(cfg.stats*score/Math.max(1,scale)+cfg.wins*success+cfg.scarcity*scarcity);
    return {id:p.id,name:p.name,pos:p.pos,team:p.team,rating:p.rating,age:p.age,
-     rookie:!!(p.rookie||p.rookieDraft),score:Math.round(total*10)/10,
+     rookie:!!(p.rookieDraft?p.rookieDraft.year===s.year:(p.rookie&&p.age<=23)),
+     score:Math.round(total*10)/10,
      statsScore:Math.round(score/Math.max(1,scale)*100),teamPct:Math.round(success*100)};
  }).sort((a,b)=>b.score-a.score||String(a.id).localeCompare(String(b.id)));
  const select=(pool,counts)=>Object.entries(counts).flatMap(([pos,count])=>
