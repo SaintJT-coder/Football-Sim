@@ -62,7 +62,7 @@ function upgradeLeague(s){
  const generated=generate();
  let nextId=Math.max(-1,...s.players.map(p=>p.id||0))+1;
  for(const p of generated){if(p.team>=0&&!existing.has(p.team)){p.id=nextId++;s.players.push(p)}}
- if(s.engine){s.engine.season=0;s.engine.schedule=[]}
+ s.cap=Math.max(350,s.cap||0);if(s.engine){s.engine.season=0;s.engine.schedule=[]}
  return s;
 }
 function enter(s,i){s=upgradeLeague(s);if(melodyTimer){clearInterval(melodyTimer);melodyTimer=null}if(!valid(s))return alert('This save is invalid.');state=s;if(Number.isInteger(i))state.menuSlot=i;localStorage.setItem(ACTIVE,JSON.stringify(state));$('gm-menu')?.remove();render()}
