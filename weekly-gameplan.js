@@ -122,12 +122,18 @@ function focus(s,id,mode){
  const budget=root.GMDevelopment?.budget(s);
  if(!budget||budget.points<CONFIG.focus.cost)return {ok:false,error:'Not enough training points'};
  budget.points-=CONFIG.focus.cost;
- if(mode==='RECOVERY')p.fatigue=clamp((p.fatigue||0)-CONFIG.focus.recoveryFatigue,0,100);
- if(mode==='FILM'){
-   root.GMDevelopment?.gainXP(p,CONFIG.focus.filmXP,s);
-   p.morale=clamp((p.morale??65)+CONFIG.focus.filmMorale,0,100);
+ let outcome='Temporary +'+CONFIG.focus.techniqueRating+' effective OVR';
+ if(mode==='RECOVERY'){
+   const before=p.fatigue||0;
+   p.fatigue=clamp(before-CONFIG.focus.recoveryFatigue,0,100);
+   outcome='Recovered '+Math.round(before-p.fatigue)+' fatigue';
  }
- entries.push({playerId:p.id,name:p.name,mode});
+ if(mode==='FILM'){
+   const gained=root.GMDevelopment?.gainXP(p,CONFIG.focus.filmXP,s)||0;
+   p.morale=clamp((p.morale??65)+CONFIG.focus.filmMorale,0,100);
+   outcome='Gained '+gained+' XP and +'+CONFIG.focus.filmMorale+' morale';
+ }
+ entries.push({playerId:p.id,name:p.name,mode,outcome});
  s.news?.unshift('Practice focus: '+p.name+' — '+mode.toLowerCase()+'.');
  return {ok:true,remaining:budget.points};
 }
@@ -291,9 +297,11 @@ function page(s){
      (selected?'ELEVATED':'ELEVATE')+'</button></div>';
  }).join('')+'</div></div>'+
  '<div class="card"><h2>04 / PRACTICE REPORTS</h2>'+
- (x.reports.slice(0,CONFIG.report.latest).map(y=>'<p><b>'+y.year+' · Week '+y.week+
- '</b> · Player of the Week: '+escape(y.player)+' ('+escape(y.playerPosition)+') · '+y.focuses.length+
- ' focus(es), '+y.elevations.length+' elevation(s)</p>').join('')||'<p>Simulate your next game to generate the first practice report.</p>')+'</div>';
+ (x.reports.slice(0,CONFIG.report.latest).map(y=>'<div style="padding:10px 0;border-bottom:1px solid #303744"><b>'+y.year+' · WEEK '+y.week+
+ '</b><p>🏅 Player of the Week: '+escape(y.player)+' ('+escape(y.playerPosition)+')</p><p class="muted">'+
+ y.focuses.length+' training focus(es) · '+y.elevations.length+' elevation(s) · Target: '+escape(y.target)+'</p>'+
+ y.focuses.map(f=>'<p>'+escape(f.name)+' · '+escape(f.mode)+' — '+escape(f.outcome||'Completed')+'</p>').join('')+
+ '</div>').join('')||'<p>Simulate your next game to generate the first practice report.</p>')+'</div>';
 }
 root.GMWeeklyGameplan={
  CONFIG,init,plan,set,opponent,matchup,focus,focusList,playerBoost,elevate,replacements,
