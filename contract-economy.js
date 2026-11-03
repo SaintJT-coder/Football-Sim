@@ -30,6 +30,8 @@ const CONFIG={
    SACKS:'sacks',RECEPTIONS:'receptions',TOUCHDOWNS:'td',
    TEAM_WINS:'teamWins',PLAYOFFS:'playoffs'
  }},
+ freeAgency:{scoreMin:-12,scoreMax:12,salaryBias:8,guaranteeWeight:9,bonusWeight:4,
+    longTermBias:3,shortTermBias:3,clauseBonus:3},
  ledger:{eventLimit:70}
 };
 const clamp=(n,a=0,b=1e6)=>Math.max(a,Math.min(b,Number(n)||0));
@@ -102,6 +104,17 @@ function evaluateOffer(p,s,o={}){
    reason:wantsClauses&&!clauses.noTrade&&!clauses.noTag?'Top player demands no-trade or no-tag protection':
      salary<requiredRounded?'Annual salary below agent target':'Acceptable structure'};
 }
+function freeAgentScoreModifier(p,o={}){
+ const persona=CONFIG.agents[agent(p).persona],cfg=CONFIG.freeAgency;
+ const base=Math.max(1,(p.salary||o.salary||1)),salary=Number(o.salary)||0,
+  guaranteed=Number(o.guaranteed)||0,bonus=Number(o.bonus)||0,years=Number(o.years)||1;
+ let result=(salary/base-1)*cfg.salaryBias*(persona.salary-1)*3;
+ result+=(guaranteed/Math.max(1,salary*years))*cfg.guaranteeWeight*(persona.guarantee-1);
+ result+=(bonus/Math.max(1,salary*years))*cfg.bonusWeight*(1/persona.bonus);
+ result+=years>=4?(persona.longBias<0?cfg.longTermBias:0):years<=2?(persona.shortBias>0?-cfg.shortTermBias:0):0;
+ if(['NO_TRADE','NO_TAG'].includes(o.clause))result+=cfg.clauseBonus;
+ return Math.round(clamp(result,cfg.scoreMin,cfg.scoreMax));
+}
 function ensureContract(p,s){
  const c=root.GMContractsAdvanced?.init(p,s);
  if(!c)throw Error('Advanced contract system unavailable');
@@ -163,7 +176,7 @@ function extend(p,s,offer={}){
  c.options.push(...options);
  c.voidYears+=voidYears;
  for(let k=0;k<voidYears;k++)c.voidProration.push({year:startYear+activeAdded+k,amount:prorated,accelerated:false});
- c.clauses={...c.clauses,...clauses};
+ c.clauses={noTrade:!!c.clauses.noTrade||clauses.noTrade,noTag:!!c.clauses.noTag||clauses.noTag};
  c.disgruntled=false;c.holdout=false;
  s.cash=money(s.cash-bonus);
  // Existing player.year is the next active contract expiry; void years don't extend playing time.
@@ -380,7 +393,7 @@ function page(s){
  'M · Penalty $'+money(x.penalties[h.year+1]?.[s.team]||0)+'M</div>').join('')||
  '<div class="card">Complete a season to record the first cap report.</div>');
 }
-root.GMContractEconomy={CONFIG,agent,init,baseLimit,capAt,legacyDead,dead,
+root.GMContractEconomy={CONFIG,agent,freeAgentScoreModifier,init,baseLimit,capAt,legacyDead,dead,
  ladderHit,payroll,sheet,table,market,evaluateOffer,ensureContract,grantClause,canTrade,canTag,
  extend,setOption,settleOptions,addLadder,assessLadders,accelerateVoid,release,
  seasonEnd,advanceYear,registerSigning,page};
