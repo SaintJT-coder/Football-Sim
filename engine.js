@@ -42,9 +42,18 @@ const noise=(m=1)=> (Math.random()+Math.random()+Math.random()-1.5)*m;
 const points=(off,def,home)=>clamp(Math.round(23+(off-def)*.6+noise(17)+(home?1.5:0)),3,56);
 const distribute=(players,total,field,weights)=>{
  if(!players.length)return;
- const ws=players.map(weights),sum=ws.reduce((a,b)=>a+b,0)||1;
+ // Rounding each player's proportional share independently could over-allocate
+ // small totals (especially touchdowns), giving the last player negative stats.
+ const available=Math.max(0,Math.round(Number(total)||0));
+ const ws=players.map(p=>Math.max(0,Number(weights(p))||0));
+ const sum=ws.reduce((a,b)=>a+b,0)||1;
  let allocated=0;
- players.forEach((p,i)=>{let n=i===players.length-1?total-allocated:Math.max(0,Math.round(total*ws[i]/sum));allocated+=n;p.stats[field]=(p.stats[field]||0)+n});
+ players.forEach((p,i)=>{
+   const remaining=available-allocated;
+   const n=i===players.length-1?remaining:
+     Math.min(remaining,Math.max(0,Math.round(available*ws[i]/sum)));
+   allocated+=n;p.stats[field]=(p.stats[field]||0)+n;
+ });
 };
 function gameContext(g){
  const weather=['Clear','Clear','Clear','Rain','Wind','Snow','Extreme Cold'][rand(0,6)];
