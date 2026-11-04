@@ -9,7 +9,12 @@ const read=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}
 const slots=()=>{const a=read(SLOTS);return Array.from({length:3},(_,i)=>valid(a?.[i]?.data)?a[i]:null)};
 const store=a=>localStorage.setItem(SLOTS,JSON.stringify(a));
 const team=i=>TEAMS[i]?.[1]||'Unknown franchise';
-const active=()=>{const a=read(ACTIVE);return valid(a)?a:null};
+const active=()=>{
+ const saved=window.GMSaveManager?.restore?.();
+ if(valid(saved))return saved;
+ const legacy=read(ACTIVE);
+ return valid(legacy)?legacy:null;
+};
 let screen='splash',chosen=0,slot=0,difficulty='Pro',length='endless',prefs={volume:35,music:true,teamNames:'fictional',scale:100,reduced:false,...read(PREF)};
 const css=`
 #gm-menu{position:fixed;inset:0;z-index:99999;overflow:auto;background:radial-gradient(ellipse at 82% 12%,#173a36 0%,transparent 43%),radial-gradient(ellipse at 15% 85%,#263119 0%,transparent 42%),#070d10;color:#eff6ef;font-family:Impact,"Arial Narrow",system-ui,sans-serif;font-size:calc(16px * var(--gm-scale,1));isolation:isolate}
@@ -77,7 +82,31 @@ function create(){
 }
 function handleClick(e){startMusic();const b=e.target.closest('#gm-menu button');if(!b)return;if(b.dataset.team!==undefined){chosen=Number(b.dataset.team);show();return}if(b.dataset.load!==undefined){const x=slots()[Number(b.dataset.load)];if(x){window.GMSaveManager?.create(x.data,team(x.data.team)+' Legacy Franchise');enter(x.data,Number(b.dataset.load))}return}if(b.dataset.delete!==undefined){const i=Number(b.dataset.delete);if(!confirm('Permanently delete slot '+(i+1)+'?'))return;const a=slots();a[i]=null;store(a);if(active()?.menuSlot===i)localStorage.removeItem(ACTIVE);show();return}if(b.dataset.newSlot!==undefined){slot=Number(b.dataset.newSlot);screen='new';show();return}const cmd=b.dataset.action;if(cmd==='load'&&window.GMSaveManager){$('gm-menu')?.remove();page='Save Manager';render();return}if(['main','new','load','settings','credits'].includes(cmd)){screen=cmd;show()}else if(cmd==='continue'){const a=active();if(a)enter(a)}else if(cmd==='start')create();else if(cmd==='reset'){alert('Delete individual franchises from Save Manager to avoid accidental loss.')}}
 function handleChange(e){const x=e.target;if(x.id==='gm-difficulty')difficulty=x.value;else if(x.id==='gm-length')length=x.value==='endless'?'endless':Number(x.value);else if(x.id==='gm-slot')slot=Number(x.value);else if(x.id==='gm-team-names'){prefs.teamNames=x.value;localStorage.setItem(PREF,JSON.stringify(prefs));window.gmSetTeamNamingPreset?.(x.value);show()}else if(x.id==='gm-volume'||x.id==='gm-music'||x.id==='gm-scale'||x.id==='gm-reduced'){if(x.id==='gm-volume')prefs.volume=Number(x.value);if(x.id==='gm-music')prefs.music=x.checked;if(x.id==='gm-scale')prefs.scale=Number(x.value);if(x.id==='gm-reduced')prefs.reduced=x.checked;localStorage.setItem(PREF,JSON.stringify(prefs));document.documentElement.style.setProperty('--gm-scale',prefs.scale/100);document.body.classList.toggle('gm-reduce',prefs.reduced);show();updateMusic()}}
-function boot(){window.gmSetTeamNamingPreset?.(prefs.teamNames);state=upgradeLeague(state);style();document.documentElement.style.setProperty('--gm-scale',prefs.scale/100);document.body.classList.toggle('gm-reduce',prefs.reduced);window.GMSaveManager?.bootstrap(state);document.addEventListener('click',handleClick);document.addEventListener('change',handleChange);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('gm-menu')&&!['main','splash'].includes(screen)){screen='main';show()}});show()}
-window.openGridironMenu=()=>{try{save()}catch(e){console.warn(e)}screen='main';show()};
+function boot(){
+ window.gmSetTeamNamingPreset?.(prefs.teamNames);
+ const manager=window.GMSaveManager;
+ const recovered=manager?.restore?.();
+ if(recovered)state=upgradeLeague(recovered);
+ else state=upgradeLeague(state);
+ style();
+ document.documentElement.style.setProperty('--gm-scale',prefs.scale/100);
+ document.body.classList.toggle('gm-reduce',prefs.reduced);
+ // Preserve legacy saves, but don't make a real slot from an unsaved splash-screen state.
+ if(active()||manager?.index()?.length)manager?.bootstrap(state);
+ const selected=manager?.restore?.();
+ if(selected)state=upgradeLeague(selected);
+ document.addEventListener('click',handleClick);
+ document.addEventListener('change',handleChange);
+ document.addEventListener('keydown',e=>{
+   if(e.key==='Escape'&&$('gm-menu')&&!['main','splash'].includes(screen)){
+     screen='main';show()
+   }
+ });
+ show();
+}
+window.openGridironMenu=()=>{
+ if(active()){try{save()}catch(e){console.warn(e)}}
+ screen='main';show();
+};
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
