@@ -26,7 +26,13 @@ function prospectRows(list,action=true){return list.map(p=>'<div class="card" st
 function aiDraft(pick){const f=init(),pool=f.prospects.filter(p=>!p.drafted);if(!pool.length)return;const positional=Object.fromEntries(allPos.map(pos=>[pos,need(pick.owner,pos)]));const scores=new Map(pool.map(p=>[p.id,window.GMDraftRealism?.draftValue(p,pick.owner,state,positional[p.pos])??(p.rating+p.pot*.2+positional[p.pos]*.45)]));pool.sort((a,b)=>scores.get(b.id)-scores.get(a.id));selectProspect(pool[0],pick,false)}
 function selectProspect(p,pick,persist=true){const f=init();if(!p||p.drafted||!pick||pick.used)return false;
  p.drafted=true;pick.used=true;f.draftStarted=true;
- const newId=Math.max(0,...state.players.map(x=>Number(x.id)||0))+1;
+ // Stable IDs must never be reused after a player retires or leaves the
+ // active pool; retired career records and award snapshots still refer to them.
+ if(!Number.isSafeInteger(state.nextPlayerId)||state.nextPlayerId<1){
+   const ids=[...state.players,...(state.retired||[])];
+   state.nextPlayerId=ids.reduce((max,x)=>Math.max(max,Number(x.id)||0),0)+1;
+ }
+ const newId=state.nextPlayerId++;
  const salary=+(Math.max(.7,5.2-pick.round*.57-pick.slot*.035)).toFixed(2);
  state.players.push({id:newId,name:p.name,pos:p.pos,age:p.age,rating:p.rating,pot:p.pot,salary,team:pick.owner,stats:{yards:0,td:0,tackles:0,sacks:0},injury:0,years:4,target:false,fatigue:0,morale:70,development:0,rookie:true,devTrait:p.dev});
  const rookie=state.players[state.players.length-1];
