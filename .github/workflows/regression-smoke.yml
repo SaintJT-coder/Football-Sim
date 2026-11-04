@@ -13,7 +13,9 @@ jobs:
         with:
           node-version: '22'
       - name: Check source syntax and module dependencies
-        run: node tests/source-smoke.cjs
+        run: |
+          node tests/source-smoke.cjs
+          node tests/named-slot-quota-qa-smoke.cjs
       - name: Install browser test dependency
         run: npm install --no-save playwright
       - name: Install Chromium
