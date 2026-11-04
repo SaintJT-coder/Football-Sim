@@ -20,7 +20,22 @@ function snapshot(s){const key=activeId();if(!key)return;const info=index().find
 function create(s,name){const info=write(s,name);localStorage.setItem(CURRENT,info.id);return info}
 function activate(slotId){const entry=index().find(x=>x.id===slotId),data=read(PREFIX+slotId);if(!entry||!valid(data))throw Error('Save slot is missing or invalid');localStorage.setItem(CURRENT,slotId);localStorage.setItem(KEY,JSON.stringify(data));return clone(data)}
 function branch(s,name){const parent=activeId();const info=write(clone(s),name||'What If: '+(index().find(x=>x.id===parent)?.name||'Franchise'),undefined,parent);localStorage.setItem(CURRENT,info.id);localStorage.setItem(KEY,JSON.stringify(s));return info}
-function remove(slotId){const entries=index();if(!entries.some(x=>x.id===slotId))return;localStorage.removeItem(PREFIX+slotId);localStorage.setItem(INDEX,JSON.stringify(entries.filter(x=>x.id!==slotId)));if(activeId()===slotId){localStorage.removeItem(CURRENT);const remaining=entries.filter(x=>x.id!==slotId);if(remaining.length)activate(remaining[0].id);else localStorage.removeItem(KEY)}}
+function remove(slotId){
+ const entries=index(),target=entries.find(x=>x.id===slotId);
+ if(!target)return false;
+ const wasActive=activeId()===slotId,remaining=entries.filter(x=>x.id!==slotId);
+ localStorage.removeItem(PREFIX+slotId);
+ localStorage.setItem(INDEX,JSON.stringify(remaining));
+ if(wasActive){
+   localStorage.removeItem(CURRENT);
+   // Prefer the original universe when deleting an active What If branch.
+   const preferred=remaining.find(x=>x.id===target.branchOf&&valid(read(PREFIX+x.id)))||
+     remaining.find(x=>valid(read(PREFIX+x.id)));
+   if(preferred)activate(preferred.id);
+   else localStorage.removeItem(KEY);
+ }
+ return true;
+}
 function rename(slotId,name){const entry=index().find(x=>x.id===slotId);if(!entry)throw Error('Save not found');return write(read(PREFIX+slotId),String(name||entry.name).trim(),slotId)}
 function exportSave(slotId){const data=read(PREFIX+slotId),entry=index().find(x=>x.id===slotId);if(!valid(data)||!entry)throw Error('Save not found');const json=JSON.stringify({format:'gridiron-gm',version:3,metadata:entry,state:data},null,2);const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='gridiron-'+entry.name.replace(/[^a-z0-9-]/gi,'-').slice(0,35)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 async function importSave(file){if(!file||file.size>20*1024*1024)throw Error('JSON file must be under 20 MB');const payload=JSON.parse(await file.text());if(payload.format!=='gridiron-gm'||!valid(payload.state)||payload.state.players.length>10000||payload.state.week<1||payload.state.week>30||payload.state.year<1900||payload.state.year>2500)throw Error('Unsupported or invalid Gridiron save');return write(payload.state,payload.metadata?.name||'Imported Franchise')}
