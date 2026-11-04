@@ -4,7 +4,11 @@
 'use strict';
 const CONFIG={
  story:{maxHeadlines:150,hotSeatEveryWeeks:4,hotSeatMinGames:6,hotSeatPct:.35,
-   closeMargin:3,blowoutMargin:21,youngQB:26,veteranQB:31},
+   closeMargin:3,blowoutMargin:21,youngQB:26,veteranQB:31,
+   upsetRatingGap:7,streakWins:5,streakLosses:5,qbPulseEveryWeeks:4,rookieYardsBreakout:180},
+ milestone:{passYards:[10000,20000,30000,40000,50000],passTD:[100,200,300,400],
+   rushYards:[5000,10000,15000],receivingYards:[5000,10000,15000],
+   tackles:[500,1000],sacks:[50,100,150],interceptions:[30,50]},
  record:{keys:['passYards','passTD','rushYards','receivingYards','receptions',
    'rushTD','recTD','tackles','sacks','interceptions'],maxGames:400,maxEvents:120},
  ballot:{stats:.72,wins:.20,scarcity:.08,minGames:1,
@@ -24,9 +28,12 @@ const num=x=>Math.max(0,Number(x)||0);
 function init(s){
  const d=s.leagueNarratives??={version:1,headlines:[],processedGames:[],processedWeeks:[],
    seasonRecords:{},allTimeSeasonRecords:{},careerRecords:{},franchiseRecords:{},gameRecords:{},
-   recordEvents:[],honors:[]};
+   recordEvents:[],honors:[],teamRecords:{},champions:[],teamPlayerSeason:{},
+   teamStatsYear:s.year,qbLeaders:{}};
  for(const key of ['headlines','processedGames','processedWeeks','recordEvents','honors'])d[key]??=[];
- for(const key of ['seasonRecords','allTimeSeasonRecords','careerRecords','franchiseRecords','gameRecords'])d[key]??={};
+ for(const key of ['seasonRecords','allTimeSeasonRecords','careerRecords','franchiseRecords','gameRecords','teamRecords','qbLeaders'])d[key]??={};
+ d.champions??=[];d.teamPlayerSeason??={};
+ if(d.teamStatsYear!==s.year){d.teamStatsYear=s.year;d.teamPlayerSeason={}}
  return d;
 }
 function snap(s,g){
@@ -45,7 +52,7 @@ function record(s,collection,key,value,p,kind){
  const d=init(s),previous=d[collection][key];
  if(value<=0||(previous&&previous.value>=value))return;
  const entry={value,year:s.year,week:s.week,name:p.name,playerId:p.id,
-   team:p.team,pos:p.pos,kind};
+   team:p.team,teamName:club(p.team),pos:p.pos,kind};
  d[collection][key]=entry;
  if(previous){
    d.recordEvents.unshift({collection,key,...entry});
@@ -61,21 +68,43 @@ function afterGame(s,g,before){
    if(!teams.has(p.team))continue;
    p.careerStats??={};
    const prev=before?.get(String(p.id))||{};
+   const playerTeamKey=p.team+':'+p.id;
+   const teamTotals=d.teamPlayerSeason[playerTeamKey]??={};
    for(const k of CONFIG.record.keys){
      const total=num(p.stats?.[k]),delta=Math.max(0,total-num(prev[k]));
-     if(delta>0)p.careerStats[k]=num(p.careerStats[k])+delta;
+     if(delta>0){
+       p.careerStats[k]=num(p.careerStats[k])+delta;
+       teamTotals[k]=num(teamTotals[k])+delta;
+       const current=p.careerStats[k],prior=current-delta;
+       for(const threshold of CONFIG.milestone[k]||[])if(prior<threshold&&current>=threshold)
+         story(s,'MILESTONE',p.name+' reaches '+threshold.toLocaleString()+
+           ' career '+k+'.',[p.team]);
+     }
      if(total>0){
        record(s,'seasonRecords',s.year+':'+k,total,p,'league season '+k);
        record(s,'allTimeSeasonRecords',k,total,p,'all-time single-season '+k);
-       record(s,'franchiseRecords',p.team+':'+k,total,p,'franchise season '+k);
+       // Credit only stats earned for this franchise, not stats before a midseason trade.
+       if(num(teamTotals[k]))record(s,'franchiseRecords',p.team+':'+k,teamTotals[k],p,'franchise season '+k);
      }
      if(delta>0)record(s,'gameRecords',k,delta,p,'single-game '+k);
      const career=num(p.careerStats[k]);
      if(career>0)record(s,'careerRecords',k,career,p,'league career '+k);
    }
+   if((p.rookieDraft?.year===s.year||p.rookie&&p.age<=23)&&
+      num(p.stats?.receivingYards)-num(prev.receivingYards)>=CONFIG.story.rookieYardsBreakout)
+     story(s,'ROOKIE_BREAKOUT',p.name+' delivers a breakout receiving game for '+club(p.team)+'.',[p.team]);
  }
  const winner=g.sa>g.sb?g.a:g.b,loser=winner===g.a?g.b:g.a,
    margin=Math.abs(g.sa-g.sb);
+ const strength=team=>{
+   const rated=s.players.filter(p=>p.team===team).sort((a,b)=>(b.rating||0)-(a.rating||0)).slice(0,12);
+   return rated.length?rated.reduce((n,p)=>n+(p.rating||0),0)/rated.length:70;
+ };
+ if(strength(loser)-strength(winner)>=CONFIG.story.upsetRatingGap)
+   story(s,'UPSET',club(winner)+' shocks favored '+club(loser)+' in a '+g.sa+'–'+g.sb+' upset.',[g.a,g.b]);
+ const lastFive=(s.results||[]).filter(x=>x.year===s.year&&(x.a===winner||x.b===winner)).slice(-CONFIG.story.streakWins);
+ if(lastFive.length===CONFIG.story.streakWins&&lastFive.every(x=>(x.sa>x.sb?x.a:x.b)===winner))
+   story(s,'WIN_STREAK',club(winner)+' extends its winning streak to '+CONFIG.story.streakWins+' games.',[winner]);
  if(margin<=CONFIG.story.closeMargin)
    story(s,'THRILLER',club(winner)+' edges '+club(loser)+' in a '+margin+'-point finish.',[g.a,g.b]);
  else if(margin>=CONFIG.story.blowoutMargin)
