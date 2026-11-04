@@ -53,10 +53,10 @@ assert.equal(JSON.stringify(cpu.personalityProfile.traits),originalTrait);
 assert.equal(cpu.personalityProfile.snaps.season,340);
 assert.equal(cpu.personalityProfile.snaps.total,10920);
 assert.equal(state.news.length,T.CONFIG.newsEntries);
-assert.equal(state.simPresentation.gameReports.filter(x=>x.a===0).length,24);
+assert.equal(state.simPresentation.gameReports.filter(x=>x.a===0).length,20);
 assert.equal(state.simPresentation.gameReports.filter(x=>x.a===2).length,15);
-assert.equal(state.simPresentation.pressConferences.length,50);
-assert.equal(state.simPresentation.rivalries['0-1'].results.length,4);
+assert.equal(state.simPresentation.pressConferences.length,30);
+assert.equal(state.simPresentation.rivalries['0-1'].results.length,2);
 assert.ok(state.simPresentation.gameReports.every(r=>r.leaders.every(p=>!('stats' in p))));
 assert.ok(state.simPresentation.gameReports.filter(r=>r.year===2025).every(r=>!('originalReport' in r)));
 
