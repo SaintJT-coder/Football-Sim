@@ -93,7 +93,7 @@ window.autoDraft=function(){
 function draftStage(){
  const f=state.frontOffice,picks=f.picks.filter(p=>!p.used).sort((a,b)=>a.round-b.round||a.slot-b.slot),now=picks[0],nextMine=picks.find(p=>p.owner===state.team),recent=f.draftLog.slice(-5).reverse();
  const strip=picks.slice(0,9).map((p,i)=>'<div class="dn-pick '+(!i?'current':'')+'">RD '+p.round+' · PK '+p.slot+'<br><b>'+TEAMS[p.owner][0]+'</b></div>').join('');
- return '<div class="dn-page"><div class="dn-top"><strong>🏈 '+state.year+' ROOKIE DRAFT</strong><div class="dn-clock">ON THE CLOCK · '+(now?'RD '+now.round+' PK '+now.slot:'COMPLETE')+'</div><strong>YOUR NEXT PICK: '+(nextMine?'RD '+nextMine.round+' · PK '+nextMine.slot:'NONE')+'</strong></div><div class="dn-picks">'+strip+'</div><div class="dn-stage"><div class="dn-lights"></div><div class="dn-arch"><p>GRIDIRON GM · DRAFT NIGHT</p><h2>'+(now?TEAMS[now.owner][1].toUpperCase():'DRAFT COMPLETE')+'</h2><p>'+(now?'ON THE CLOCK':'ALL SELECTIONS FINAL')+'</p></div></div><div class="dn-actions"><button class="primary" onclick="window.advanceDraft()">SKIP TO MY NEXT PICK</button><button onclick="window.autoDraft()">SIMULATE REMAINING DRAFT</button><button onclick="window.draftShowBoard()">VIEW DRAFT BOARD</button><button onclick="window.showDraftIntro()">REPLAY OPENING</button></div><div class="dn-panel"><h3>PREVIOUS SELECTIONS</h3><div class="dn-recent">'+(recent.map(x=>'<div><b>RD '+x.round+' · '+TEAMS[x.team][0]+'</b><p>'+x.player+' · '+x.pos+' · '+x.overall+' OVR</p></div>').join('')||'<p>Waiting for the first selection</p>')+'</div></div></div>';
+ return '<div class="dn-page"><div class="dn-top"><strong>🏈 '+state.year+' ROOKIE DRAFT</strong><div class="dn-clock">ON THE CLOCK · '+(now?'RD '+now.round+' PK '+now.slot:'COMPLETE')+'</div><strong>YOUR NEXT PICK: '+(nextMine?'RD '+nextMine.round+' · PK '+nextMine.slot:'NONE')+'</strong></div><div class="dn-picks">'+strip+'</div><div class="dn-stage"><div class="dn-lights"></div><div class="dn-arch"><p>GRIDIRON GM · DRAFT NIGHT</p><h2>'+(now?TEAMS[now.owner][1].toUpperCase():'DRAFT COMPLETE')+'</h2><p>'+(now?'ON THE CLOCK':'ALL SELECTIONS FINAL')+'</p></div></div><div class="dn-actions"><button class="primary" onclick="window.advanceDraft()">SKIP TO MY NEXT PICK</button><button onclick="window.autoDraft()">SIMULATE REMAINING DRAFT</button><button onclick="window.draftShowBoard()">'+(showBoard?'HIDE DRAFT BOARD':'VIEW DRAFT BOARD')+'</button><button onclick="window.showDraftIntro()">REPLAY OPENING</button></div><div class="dn-panel"><h3>PREVIOUS SELECTIONS</h3><div class="dn-recent">'+(recent.map(x=>'<div><b>RD '+x.round+' · '+TEAMS[x.team][0]+'</b><p>'+x.player+' · '+x.pos+' · '+x.overall+' OVR</p></div>').join('')||'<p>Waiting for the first selection</p>')+'</div></div></div>';
 }
 
 const introStyle=document.createElement('style');introStyle.textContent=`
@@ -112,7 +112,7 @@ const introStyle=document.createElement('style');introStyle.textContent=`
 @keyframes dn-intro-rise{from{opacity:0;transform:translateY(100px) scale(.8)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(prefers-reduced-motion:reduce){.dn-intro-spot,.dn-intro-arch{animation:none!important}}
 `;document.head.appendChild(introStyle);
-let introShown=false;
+let introShownFor=null;
 window.closeDraftIntro=function(){document.getElementById('dn-intro')?.remove()};
 window.showDraftIntro=function(){
  if(document.getElementById('dn-intro'))return;
@@ -157,7 +157,11 @@ render=function(){
  if(page==='Fantasy Draft'||page==='Draft Board'){
  const app=document.getElementById('app');if(!app)return;
  const current=app.innerHTML;
- if(!introShown){introShown=true;window.showDraftIntro()}
+ const draftIdentity=(window.GMSaveManager?.activeId?.()||'unsaved')+':'+state.year;
+ if(introShownFor!==draftIdentity&&state.frontOffice?.picks?.some(p=>!p.used)){
+   introShownFor=draftIdentity;
+   window.showDraftIntro();
+ }
  app.innerHTML=draftStage()+(showBoard?'<div class="dn-panel"><h3>YOUR DRAFT BOARD</h3>'+current+'</div>':'');
  }
 };
