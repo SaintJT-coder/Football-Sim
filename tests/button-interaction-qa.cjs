@@ -32,10 +32,10 @@ const {chromium}=require('playwright');
          let syntax=null,missingHandler=null;
          if(code){
            try{new Function('event',code)}catch(e){syntax=e.message}
-           const call=code.match(/^\\s*([A-Za-z_$][\\w$]*)\\s*\\(/);
+           const call=code.match(/^\s*([A-Za-z_$][\w$]*)\s*\(/);
            if(call&&typeof window[call[1]]!=='function')
              missingHandler=call[1];
-           const qualified=code.match(/^\\s*window\\.([A-Za-z_$][\\w$]*)\\s*\\(/);
+           const qualified=code.match(/^\s*window\.([A-Za-z_$][\w$]*)\s*\(/);
            if(qualified&&typeof window[qualified[1]]!=='function')
              missingHandler='window.'+qualified[1];
          }
