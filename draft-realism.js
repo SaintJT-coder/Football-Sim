@@ -6,12 +6,15 @@ const CONFIG={
  pool:{rounds:7,prospectsPerPick:1.25,minExtra:40,firstRating:83,dropPer24:2,
    noise:7,minRating:52,maxRating:86,potentialMin:3,potentialMax:17},
  scouting:{baseAccuracy:.28,scoutPerPoint:.16,staffPerPoint:.003,
-   facilityPerTier:.05,maxAccuracy:.96,initialError:15,confidencePerPoint:19,
+   facilityPerTier:.04,maxAccuracy:.96,initialError:15,confidencePerPoint:19,
    combineAccuracy:.07,proDayAccuracy:.06,workoutAccuracy:.09,scoreCost:3},
  resources:{proDays:8,combineReview:24,privateWorkouts:8},
  combine:{fortyBase:4.54,fortySpread:.49,verticalBase:31,verticalSpread:15,
    benchBase:14,benchSpread:22,shuttleBase:4.15,shuttleSpread:.50,
-   gradeShiftLimit:3},
+   gradeShiftLimit:3,fortyRange:[4.25,5.3],verticalRange:[20,48],benchRange:[0,45],shuttleRange:[3.7,5.2]},
+ pickChart:{anchors:[[1,3000],[2,2600],[3,2200],[4,1800],[5,1700],[10,1300],[16,1000],[24,740],[32,590],[40,500],[48,420],[64,270],[80,190],[96,116],[112,70],[128,44],[160,28],[192,16],[224,2]],lastPick:224},
+ risk:{medicalRate:.13,highConcernPenalty:4},
+
  trade:{margin:1.08,positionNeedMax:1.18,positionNeedMin:.92,roundPremium:1.02},
  fifthYear:{length:4,optionYear:5,deadlineSeasonOffset:2,
    salaryMultiplier:1.4,salaryFloor:5,exerciseMinRating:77,autoDecisionWeek:18},
@@ -77,7 +80,7 @@ function generate(s,existing=[]){
  return output;
 }
 function staffQuality(s){
- const staff=Number(s.staff?.scouting?.rating||s.staff?.scouting?.evaluation||70);
+ const staff=Number(s.staff?.scouting?.rating??s.staff?.scouting?.evaluation??s.staff?.scout?.rating??s.staff?.scoutRating??70);
  const facility=Number(s.ownerFranchise?.facilities?.scouting||0);
  return {staff,facility};
 }
@@ -115,13 +118,16 @@ function combine(p,s){
    const r=rng('combine:'+s.year+':'+p.id),speed=(d.trueAttributes.speed||p.athletic||70);
    const power=(d.trueAttributes.strength||p.rating||70);
    d.combine={
-     forty:round(CONFIG.combine.fortyBase+(76-speed)*.012+(r()-.5)*.16,2),
-     vertical:round(CONFIG.combine.verticalBase+(speed-70)*.20+(r()-.5)*8,1),
-     bench:Math.round(CONFIG.combine.benchBase+(power-68)*.25+(r()-.5)*9),
-     shuttle:round(CONFIG.combine.shuttleBase+(75-speed)*.007+(r()-.5)*.14,2)
+     forty:round(clamp(CONFIG.combine.fortyBase+(76-speed)*.012+(r()-.5)*.16,...CONFIG.combine.fortyRange),2),
+     vertical:round(clamp(CONFIG.combine.verticalBase+(speed-70)*.20+(r()-.5)*8,...CONFIG.combine.verticalRange),1),
+     bench:Math.round(clamp(CONFIG.combine.benchBase+(power-68)*.25+(r()-.5)*9,...CONFIG.combine.benchRange)),
+     shuttle:round(clamp(CONFIG.combine.shuttleBase+(75-speed)*.007+(r()-.5)*.14,...CONFIG.combine.shuttleRange),2)
    };
  }
- d.gradeShift=clamp(Math.round(((p.athletic||70)-70)/12),-CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
+ d.combineShift??=clamp(Math.round(((p.athletic||70)-70)/12),
+   -CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
+ d.gradeShift=clamp(d.combineShift+(d.proDay?.gradeShift||0),
+   -CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
  p.projection=estimated(p,s);
  return d.combine;
 }
@@ -134,7 +140,8 @@ function proDay(p,s){
  const r=rng('proday:'+s.year+':'+p.id);
  const delta=Math.round((r()-.5)*5);
  d.proDay={year:s.year,gradeShift:delta,medicalVerified:r()>.13};
- d.gradeShift=clamp(d.gradeShift+delta,-CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
+ d.gradeShift=clamp((d.combineShift||0)+delta,
+   -CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
  p.projection=estimated(p,s);
  return {ok:true,report:d.proDay,grade:p.projection};
 }
@@ -169,9 +176,17 @@ function draftValue(p,team,s,positionNeed){
  return base+(p.pot||base)*.14+shortage+noise*.3;
 }
 function pickValue(round,slot,s){
- const n=root.TEAMS?.length||32;
- return root.GMRosterRules?.pickValue(round,slot)||
-   Math.round(3000*Math.pow(Math.max(1,(round-1)*n+slot),-.64));
+ const n=root.TEAMS?.length||32,ordinal=(Math.floor(Number(round))-1)*n+Math.floor(Number(slot)),
+   anchors=CONFIG.pickChart.anchors;
+ if(!Number.isFinite(ordinal)||ordinal<1||ordinal>CONFIG.pool.rounds*n)return 0;
+ for(let i=1;i<anchors.length;i++){
+   const [nextPick,nextVal]=anchors[i];
+   if(ordinal<=nextPick){
+     const [prevPick,prevVal]=anchors[i-1],fraction=(ordinal-prevPick)/(nextPick-prevPick);
+     return Math.max(1,Math.round(prevVal+(nextVal-prevVal)*fraction));
+   }
+ }
+ return anchors[anchors.length-1][1];
 }
 function positionalNeed(s,team){
  const roster=s.players.filter(p=>p.team===team);
@@ -233,13 +248,18 @@ function decideFifthYear(p,s,exercise,automatic=false){
  if(!automatic&&s.year<o.deadlineYear)return {ok:false,error:'Option decisions open in '+o.deadlineYear};
  if(!automatic&&(s.year>o.deadlineYear||(s.year===o.deadlineYear&&s.week>o.deadlineWeek)))
    return {ok:false,error:'Fifth-year decision deadline has passed'};
- o.decided=true;o.exercised=!!exercise;o.decidedYear=s.year;
+ const c=exercise?root.GMContractsAdvanced?.init(p,s):null;
+ if(exercise&&!c)return {ok:false,error:'Advanced contract module unavailable'};
  if(exercise){
-   const c=root.GMContractsAdvanced?.init(p,s);
-   if(!c)return {ok:false,error:'Advanced contract module unavailable'};
+   const year=o.optionYear;
+   const forecast=root.GMContractEconomy?.sheet(s,s.team,year);
+   const alreadySalary=(c?.baseSalaries?.[year-c.startYear]||0);
+   if(forecast&&forecast.space+alreadySalary<o.salary)
+     return {ok:false,error:'Fifth-year option exceeds projected '+year+' cap room'};
    c.baseSalaries.push(o.salary);c.bonusProration.push(0);c.guarantees.push(o.salary);
    p.years=(p.years||1)+1;
  }
+ o.decided=true;o.exercised=!!exercise;o.decidedYear=s.year;
  s.news?.unshift(p.name+' fifth-year option '+(exercise?'EXERCISED':'DECLINED')+
    ' for '+o.optionYear+'.');
  return {ok:true,exercised:!!exercise,salary:o.salary};
@@ -247,7 +267,7 @@ function decideFifthYear(p,s,exercise,automatic=false){
 function seasonEnd(s){
  const changes=[];for(const p of s.players){
    const o=p.draftFifthYear;
-   if(!o||o.decided||o.deadlineYear!==s.year||p.team<0)continue;
+   if(!o||o.decided||o.deadlineYear>s.year||p.team<0)continue;
    const exercise=p.rating>=CONFIG.fifthYear.exerciseMinRating;
    if(p.team===s.team){ // Automatic conservative fallback if user did not choose.
      const result=decideFifthYear(p,s,exercise,true);if(result.ok)changes.push({playerId:p.id,exercise,auto:true});
