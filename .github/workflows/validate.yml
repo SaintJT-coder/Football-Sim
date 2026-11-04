@@ -28,5 +28,7 @@ jobs:
         run: |
           npm install --no-save playwright@1.56.1
           npx playwright install --with-deps chromium
-      - name: Run mobile browser regression
-        run: node tests/smoke.cjs
+      - name: Run mobile browser and tablet layout regressions
+        run: |
+          node tests/smoke.cjs
+          node tests/mobile-layout-qa-smoke.cjs
