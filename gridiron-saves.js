@@ -8,6 +8,12 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const index=()=>Array.isArray(read(INDEX))?read(INDEX):[];
 const id=()=>Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
 const activeId=()=>localStorage.getItem(CURRENT);
+function restore(){
+ const slotId=activeId();
+ if(!slotId||!index().some(x=>x.id===slotId))return null;
+ const data=read(PREFIX+slotId);
+ return valid(data)?clone(data):null;
+}
 const meta=(s,name,branchOf)=>({name:String(name||'Franchise').slice(0,80),year:s.year,week:s.week,team:s.team,lastPlayed:new Date().toISOString(),branchOf:branchOf||null});
 function write(s,name,slotId,branchOf){if(!valid(s))throw Error('Invalid franchise state');const key=slotId||id(),entries=index(),previous=entries.find(x=>x.id===key);const info={id:key,...meta(s,name||previous?.name,branchOf===undefined?previous?.branchOf:branchOf)};localStorage.setItem(PREFIX+key,JSON.stringify(s));const updated=[info,...entries.filter(x=>x.id!==key)];localStorage.setItem(INDEX,JSON.stringify(updated));return info}
 function snapshot(s){const key=activeId();if(!key)return;const info=index().find(x=>x.id===key);if(!info)return;write(s,info.name,key)}
@@ -18,7 +24,21 @@ function remove(slotId){const entries=index();if(!entries.some(x=>x.id===slotId)
 function rename(slotId,name){const entry=index().find(x=>x.id===slotId);if(!entry)throw Error('Save not found');return write(read(PREFIX+slotId),String(name||entry.name).trim(),slotId)}
 function exportSave(slotId){const data=read(PREFIX+slotId),entry=index().find(x=>x.id===slotId);if(!valid(data)||!entry)throw Error('Save not found');const json=JSON.stringify({format:'gridiron-gm',version:3,metadata:entry,state:data},null,2);const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='gridiron-'+entry.name.replace(/[^a-z0-9-]/gi,'-').slice(0,35)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
 async function importSave(file){if(!file||file.size>20*1024*1024)throw Error('JSON file must be under 20 MB');const payload=JSON.parse(await file.text());if(payload.format!=='gridiron-gm'||!valid(payload.state)||payload.state.players.length>10000||payload.state.week<1||payload.state.week>30||payload.state.year<1900||payload.state.year>2500)throw Error('Unsupported or invalid Gridiron save');return write(payload.state,payload.metadata?.name||'Imported Franchise')}
-function bootstrap(s){if(!valid(s))return;const current=activeId();if(current&&index().some(x=>x.id===current))return;const existing=index()[0];if(existing){localStorage.setItem(CURRENT,existing.id);return}const info=write(s,'Original Franchise');localStorage.setItem(CURRENT,info.id)}
+function bootstrap(s){
+ const current=activeId();
+ if(current&&restore())return;
+ const existing=index().find(x=>valid(read(PREFIX+x.id)));
+ if(existing){
+   localStorage.setItem(CURRENT,existing.id);
+   const data=read(PREFIX+existing.id);
+   localStorage.setItem(KEY,JSON.stringify(data));
+   return;
+ }
+ if(!valid(s))return;
+ const info=write(s,'Original Franchise');
+ localStorage.setItem(CURRENT,info.id);
+ localStorage.setItem(KEY,JSON.stringify(s));
+}
 function compare(slotId){
  const item=index().find(x=>x.id===slotId);if(!item?.branchOf)return null;
  const parent=index().find(x=>x.id===item.branchOf);
@@ -36,7 +56,8 @@ function compare(slotId){
    note:childData.year===parentData.year?'Same-season comparison':'Different seasons: win difference is not a like-for-like result'};
 }
 function page(s){
- bootstrap(s);
+ // Do not create a phantom franchise just because an unsaved visitor opens Load Game.
+ if(index().length||valid(read(KEY)))bootstrap(s);
  const entries=index(),current=activeId();
  const active=entries.find(e=>e.id===current),parent=entries.find(e=>e.id===active?.branchOf);
  const branches=entries.filter(e=>e.branchOf),main=entries.filter(e=>!e.branchOf);
@@ -85,7 +106,7 @@ function page(s){
    (branches.length?'<div class="grid two">'+branches.map(card).join('')+'</div>':
      '<div class="card">No alternate timelines yet. Create a What If branch to explore a different outcome without replacing your main save.</div>');
 }
-const api={index,activeId,bootstrap,snapshot,create,activate,branch,remove,rename,exportSave,importSave,compare,page};
+const api={index,activeId,restore,bootstrap,snapshot,create,activate,branch,remove,rename,exportSave,importSave,compare,page};
 w.Gridiron?.register('saves',api);w.GMSaveManager=api;
 w.gmSaveNew=()=>{const name=prompt('Name this franchise save:','My Franchise');if(!name)return;try{create(state,name);save();render()}catch(e){alert(e.message)}};
 w.gmSaveCurrent=()=>{try{if(!activeId())create(state,'Franchise');else snapshot(state);save();render()}catch(e){alert(e.message)}};
