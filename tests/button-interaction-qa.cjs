@@ -29,20 +29,27 @@ const {chromium}=require('playwright');
        const buttons=[...root.querySelectorAll('button')];
        return buttons.map(b=>{
          const code=b.getAttribute('onclick');
-         let syntax=null;
+         let syntax=null,missingHandler=null;
          if(code){
            try{new Function('event',code)}catch(e){syntax=e.message}
+           const call=code.match(/^\\s*([A-Za-z_$][\\w$]*)\\s*\\(/);
+           if(call&&typeof window[call[1]]!=='function')
+             missingHandler=call[1];
+           const qualified=code.match(/^\\s*window\\.([A-Za-z_$][\\w$]*)\\s*\\(/);
+           if(qualified&&typeof window[qualified[1]]!=='function')
+             missingHandler='window.'+qualified[1];
          }
          const rect=b.getBoundingClientRect();
          const style=getComputedStyle(b);
          return {text:(b.innerText||b.textContent||'').trim().slice(0,60),
-           code,syntax,disabled:b.disabled,zero:rect.width<1||rect.height<1,
+           code,syntax,missingHandler,disabled:b.disabled,zero:rect.width<1||rect.height<1,
            hidden:style.display==='none'||style.visibility==='hidden'};
        });
      },tab);
      counts[tab]=findings.length;
      for(const f of findings){
        if(f.syntax)failures.push(tab+': invalid onclick '+JSON.stringify(f));
+       if(f.missingHandler)failures.push(tab+': missing handler '+JSON.stringify(f));
        if(!f.disabled&&f.zero)failures.push(tab+': zero-size button '+JSON.stringify(f));
      }
    }
@@ -52,7 +59,8 @@ const {chromium}=require('playwright');
      const button=page.locator('#nav button').filter({hasText:tab}).first();
      if(!await button.count()){failures.push('Missing navigation button: '+tab);continue}
      try{
-       await button.dispatchEvent('click');
+       await page.locator('.mobilebar button').click();
+       await button.click({timeout:5000});
        const actual=await page.evaluate(()=>page);
        if(actual!==tab)failures.push('Nav "'+tab+'" stays on "'+actual+'"');
      }catch(e){failures.push('Nav "'+tab+'": '+e.message)}
