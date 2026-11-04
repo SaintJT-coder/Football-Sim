@@ -3,9 +3,9 @@
 (function(root){
 'use strict';
 const CONFIG={
- story:{maxHeadlines:150,hotSeatEveryWeeks:4,hotSeatMinGames:6,hotSeatPct:.35,
+ story:{maxHeadlines:240,hotSeatEveryWeeks:4,hotSeatMinGames:6,hotSeatPct:.35,
    closeMargin:3,blowoutMargin:21,youngQB:26,veteranQB:31,
-   upsetRatingGap:7,streakWins:5,streakLosses:5,qbPulseEveryWeeks:4,rookieYardsBreakout:180},
+   upsetRatingGap:7,streakWins:5,streakLosses:5,streakPulseEveryWins:3,qbPulseEveryWeeks:4,rookieYardsBreakout:180},
  milestone:{passYards:[10000,20000,30000,40000,50000],passTD:[100,200,300,400],
    rushYards:[5000,10000,15000],receivingYards:[5000,10000,15000],
    tackles:[500,1000],sacks:[50,100,150],interceptions:[30,50]},
@@ -127,12 +127,19 @@ function afterGame(s,g,before){
    return rated.length?rated.reduce((n,p)=>n+(p.rating||0),0)/rated.length:70;
  };
  if(strength(loser)-strength(winner)>=CONFIG.story.upsetRatingGap)
-   story(s,'UPSET',club(winner)+' shocks favored '+club(loser)+' in a '+g.sa+'–'+g.sb+' upset.',[g.a,g.b]);
+   story(s,'UPSET',club(winner)+' shocks favored '+club(loser)+' with a '+Math.max(g.sa,g.sb)+'–'+Math.min(g.sa,g.sb)+' upset.',[g.a,g.b]);
  teamMark(s,'GAME_POINTS',Math.max(g.sa,g.sb),winner,'most points in a single game');
  teamMark(s,'GAME_MARGIN',margin,winner,'largest victory margin');
- const lastFive=(s.results||[]).filter(x=>x.year===s.year&&(x.a===winner||x.b===winner)).slice(-CONFIG.story.streakWins);
- if(lastFive.length===CONFIG.story.streakWins&&lastFive.every(x=>(x.sa>x.sb?x.a:x.b)===winner))
-   story(s,'WIN_STREAK',club(winner)+' extends its winning streak to '+CONFIG.story.streakWins+' games.',[winner]);
+ const recent=(s.results||[]).filter(x=>x.year===s.year&&(x.a===winner||x.b===winner));
+ let run=0;
+ for(let i=recent.length-1;i>=0;i--){
+   const x=recent[i];
+   if((x.sa>x.sb?x.a:x.b)!==winner)break;
+   run++;
+ }
+ if(run>=CONFIG.story.streakWins&&
+    (run===CONFIG.story.streakWins||(run-CONFIG.story.streakWins)%CONFIG.story.streakPulseEveryWins===0))
+   story(s,'WIN_STREAK',club(winner)+' extends its winning streak to '+run+' games.',[winner]);
  if(margin<=CONFIG.story.closeMargin)
    story(s,'THRILLER',club(winner)+' edges '+club(loser)+' in a '+margin+'-point finish.',[g.a,g.b]);
  else if(margin>=CONFIG.story.blowoutMargin)
@@ -245,7 +252,9 @@ function seasonEnd(s){
 
 function awardsPage(s){
  const d=init(s),years=[s.year,...d.honors.map(x=>x.year)].filter((y,i,a)=>a.indexOf(y)===i);
- const year=years.includes(Number(d.awardsViewYear))?Number(d.awardsViewYear):s.year;
+ const recentlyCompleted=s.week<=1&&!((s.results||[]).some(g=>g.year===s.year));
+ const defaultYear=recentlyCompleted&&d.honors.length?d.honors[0].year:s.year;
+ const year=years.includes(Number(d.awardsViewYear))?Number(d.awardsViewYear):defaultYear;
  const final=d.honors.find(h=>h.year===year);
  const result=final||(year===s.year?ballot(s):null),status=final?'FINAL AWARDS':'LIVE AWARD WATCH';
  const choice=years.map(y=>'<option value="'+y+'"'+(year===y?' selected':'')+'>'+
