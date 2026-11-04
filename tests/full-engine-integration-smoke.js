@@ -50,6 +50,9 @@ for(const filename of modules){
  const code=fs.readFileSync(path.join(__dirname,'..',filename),'utf8');
  new vm.Script(code,{filename}).runInContext(context,{timeout:10000});
 }
+// XP calculations must tolerate callers without a state or current snap snapshot.
+const xpMultiplier=scope.GMPlayerPersonality.xpMultiplier(players[0]);
+assert.equal(Number.isFinite(xpMultiplier),true);
 scope.simulate();
 assert.equal(state.year,2026);
 assert.equal(state.week,2);
