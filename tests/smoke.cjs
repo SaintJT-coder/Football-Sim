@@ -12,6 +12,7 @@ const {chromium}=require('playwright');
  const errors=[];
  page.on('pageerror',error=>errors.push(error.message));
  page.on('dialog',async dialog=>{
+   console.log('Browser dialog:',dialog.type(),dialog.message());
    await dialog.accept(dialog.type()==='prompt'?'QA Alternate Timeline':undefined);
  });
  page.setDefaultTimeout(120000);
@@ -114,6 +115,11 @@ const {chromium}=require('playwright');
    await page.locator('#gm-menu [data-action="load"]').click();
    await page.locator('#gm-menu').waitFor({state:'detached'});
    const alphaButton=page.locator('#app button[onclick="gmLoadSlot(\''+initial.slot+'\')"]');
+   console.log('Before load storage:',await page.evaluate(()=>({
+     storageKiB:Math.round(Object.keys(localStorage).reduce((n,k)=>n+localStorage.getItem(k).length,0)/1024),
+     active:GMSaveManager.activeId(),
+     target:document.querySelector('#app button[onclick*="gmLoadSlot"]')?.getAttribute('onclick')
+   })));
    await alphaButton.click();
    // Inspect the restored state after the slot load/reload and surface actionable
    // diagnostics instead of hanging on a particular menu overlay.
