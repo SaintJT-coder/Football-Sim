@@ -41,7 +41,12 @@ window.showFirstPickBroadcast=function(pick,team,year,prospects){
  const replay=document.createElement('button');
  replay.type='button';replay.textContent='REPLAY BROADCAST ↻';
  replay.style.cssText='position:absolute;z-index:2;right:12px;top:calc(env(safe-area-inset-top) + 12px);background:#17253a;color:white;border:1px solid #64748b;border-radius:6px;padding:9px 12px;font:700 12px system-ui';
- replay.onclick=()=>{const copy=frame.srcdoc;frame.srcdoc='';frame.srcdoc=copy};
+ replay.onclick=()=>{
+   if(timer)clearTimeout(timer);
+   const copy=frame.srcdoc;
+   frame.srcdoc='';frame.srcdoc=copy;
+   timer=setTimeout(close,24000);
+ };
  overlay.append(frame,status,skip,replay);
  document.body.appendChild(overlay);
  timer=setTimeout(close,24000);
