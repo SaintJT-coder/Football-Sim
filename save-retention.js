@@ -3,7 +3,7 @@
    No binary compression or schema migration: old JSON saves remain valid. */
 (function(root){
 'use strict';
-const CONFIG={aiTrainingHistory:1,aiSnapHistory:0,aiEventHistory:1,newsEntries:500};
+const CONFIG={aiTrainingHistory:1,aiSnapHistory:0,aiEventHistory:1,newsEntries:250,leagueHeadlines:120};
 function trim(arr,maximum){
  if(!Array.isArray(arr)||arr.length<=maximum)return 0;
  const removed=arr.length-maximum;arr.length=maximum;return removed;
@@ -22,6 +22,7 @@ function compact(s){
    removed+=trim(p.personalityProfile?.events,CONFIG.aiEventHistory);
  }
  removed+=trim(s.news,CONFIG.newsEntries);
+ removed+=trim(s.leagueNarratives?.headlines,CONFIG.leagueHeadlines);
  // Game Reports & Media displays only the 12 most recent user games and 8
  // press conferences. Preserve two seasons of readable cards, while dropping
  // unused snapshots embedded in older cards. Player career stats and full
