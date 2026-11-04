@@ -127,6 +127,14 @@ scope.gmImmersionShowStats(true);
 assert.ok(immersion.yearPage(state,2026).includes('FINAL STANDINGS'));
 scope.gmImmersionShowStats(false);
 assert.ok(immersion.yearPage(state,2026).includes('YEAR IN REVIEW'));
+state.seasonRecaps.push({...JSON.parse(JSON.stringify(state.seasonRecaps[0])),
+ year:2025,awards:[{year:2025,mvp:'Prior Season MVP'}]});
+scope.gmChooseRecapYear(2025);
+assert.equal(state.recapViewYear,2025);
+assert.equal(scope.gmImmersionSelectedYear,2025);
+assert.ok(immersion.yearPage(state).includes('Prior Season MVP'));
+scope.gmImmersionYear(2026);
+assert.equal(state.recapViewYear,2026);
 
 // Creating a branch captures a clean parent and all future edits stay isolated.
 save.bootstrap(state);
