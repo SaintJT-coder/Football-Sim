@@ -48,8 +48,12 @@ function questionSet(s,g){
    {id:'accountability',text:'The responsibility starts with our coaching staff.'},
    {id:'deflect',text:'The media is making too much of one week.'}]
  };
- const qb=s.players.filter(p=>p.team===s.team&&p.pos==='QB')
-   .sort((a,b)=>(b.rating||0)-(a.rating||0))[0];
+ // The press should discuss the actual game-day starter, not an injured
+ // QB who happens to have a higher overall rating.
+ const qb=root.GMFranchise?.depth(s,s.team,'QB')?.find(p=>Number(p.injury||0)<=0&&
+   p.rosterStatus!=='PRACTICE'&&!p.contractAdvanced?.holdout)||
+   s.players.filter(p=>p.team===s.team&&p.pos==='QB'&&Number(p.injury||0)<=0)
+     .sort((a,b)=>(b.rating||0)-(a.rating||0))[0];
  const q2={id:'LOCKER_ROOM',title:'INSIDE THE LOCKER ROOM',
    text:qb?'How are you handling '+qb.name+' and the leadership group?':
      'What is the message to the locker room this week?',
