@@ -10,6 +10,7 @@ const modules=[
  'injury-medical.js','season-recap.js','draft-scouting-advanced.js',
  'draft-realism.js','simulation-presentation.js','franchise-relocation.js',
  'league-narratives.js','contracts-advanced.js','contract-economy.js',
+ 'save-retention.js',
  'engine.js','frontoffice.js','presentation-immersion.js'
 ];
 const names=['North','South','East','West'];
@@ -50,6 +51,7 @@ for(const filename of modules){
  new vm.Script(code,{filename}).runInContext(context,{timeout:10000});
 }
 
+scope.save=()=>scope.GMSaveRetention?.compact(state);
 const seasons=5,metrics=[];
 for(let season=0;season<seasons;season++){
  const year=2026+season;
