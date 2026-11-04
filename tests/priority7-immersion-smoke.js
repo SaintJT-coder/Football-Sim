@@ -79,6 +79,8 @@ const film=immersion.gameCenterPage(state);
 for(const value of ['THE FILM ROOM','QUARTER-BY-QUARTER','390','7',
  'WIND','POSTGAME MEDIA REACTION','gmImmersionSelectGame('])
  assert.ok(film.toUpperCase().includes(value.toUpperCase()),value+' is missing');
+assert.match(film,/gmImmersionSelectGame\(&quot;2026:1:0:1&quot;\)/,
+ 'Game Center links must HTML-escape game IDs');
 assert.equal(immersion.selectGame(state,'not-a-game').ok,false);
 assert.equal(immersion.selectGame(state,reports[0].id).ok,true);
 scope.page='Game Center';
@@ -138,6 +140,8 @@ assert.equal(state.recapViewYear,2026);
 
 // Creating a branch captures a clean parent and all future edits stay isolated.
 save.bootstrap(state);
+// Simulate an unsaved user decision at the exact moment of branching.
+state.cash+=11;
 const original=save.activeId(),originalCash=state.cash;
 assert.ok(original);
 const fork=save.branch(state,'What If: Go For It');
