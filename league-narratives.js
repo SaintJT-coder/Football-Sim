@@ -60,6 +60,30 @@ function record(s,collection,key,value,p,kind){
    if(p.team===s.team)story(s,'RECORD',p.name+' breaks the '+kind+' record with '+value+'.',[p.team]);
  }
 }
+function teamMark(s,key,value,team,kind){
+ const d=init(s),previous=d.teamRecords[key];
+ if(value<=0||(previous&&previous.value>=value))return null;
+ const entry={year:s.year,week:s.week,kind,value,team,teamName:club(team)};
+ d.teamRecords[key]=entry;
+ if(previous){
+   d.recordEvents.unshift({collection:'teamRecords',key,...entry});
+   d.recordEvents.length=Math.min(d.recordEvents.length,CONFIG.record.maxEvents);
+   story(s,'TEAM_RECORD',club(team)+' sets a new '+kind+' record: '+value+'.',[team]);
+ }
+ return entry;
+}
+function championship(s,champion,runner){
+ const d=init(s);
+ if(d.champions.some(x=>x.year===s.year))return d.champions.find(x=>x.year===s.year);
+ const entry={year:s.year,team:champion,teamName:club(champion),
+   runner,runnerName:club(runner)};
+ d.champions.unshift(entry);d.champions=d.champions.slice(0,60);
+ const total=d.champions.filter(x=>x.team===champion).length;
+ teamMark(s,'CHAMPIONSHIPS',total,champion,'most franchise championships');
+ story(s,'CHAMPION',entry.teamName+' defeats '+entry.runnerName+' to claim the '+s.year+
+   ' championship.',[champion,runner]);
+ return entry;
+}
 function afterGame(s,g,before){
  const d=init(s),id=[s.year,g.week,g.a,g.b].join(':');
  if(d.processedGames.includes(id))return false;
@@ -102,6 +126,8 @@ function afterGame(s,g,before){
  };
  if(strength(loser)-strength(winner)>=CONFIG.story.upsetRatingGap)
    story(s,'UPSET',club(winner)+' shocks favored '+club(loser)+' in a '+g.sa+'–'+g.sb+' upset.',[g.a,g.b]);
+ teamMark(s,'GAME_POINTS',Math.max(g.sa,g.sb),winner,'most points in a single game');
+ teamMark(s,'GAME_MARGIN',margin,winner,'largest victory margin');
  const lastFive=(s.results||[]).filter(x=>x.year===s.year&&(x.a===winner||x.b===winner)).slice(-CONFIG.story.streakWins);
  if(lastFive.length===CONFIG.story.streakWins&&lastFive.every(x=>(x.sa>x.sb?x.a:x.b)===winner))
    story(s,'WIN_STREAK',club(winner)+' extends its winning streak to '+CONFIG.story.streakWins+' games.',[winner]);
@@ -139,9 +165,14 @@ function weekly(s){
    }
  const qb=s.players.filter(p=>p.team>=0&&p.pos==='QB')
    .sort((a,b)=>num(b.stats?.passYards)-num(a.stats?.passYards))[0];
- if(qb&&num(qb.stats?.passYards)>600&&s.week>2)
-   published.push(story(s,'QB_HEADLINE',qb.name+' leads the league passing race with '+
-     Math.round(num(qb.stats.passYards))+' yards.',[qb.team]));
+ if(qb&&num(qb.stats?.passYards)>600&&s.week>2){
+   const old=d.qbLeaders[s.year],changed=!old||String(old.playerId)!==String(qb.id);
+   if(changed||s.week%CONFIG.story.qbPulseEveryWeeks===0)
+     published.push(story(s,changed?'QB_LEADER_CHANGE':'QB_HEADLINE',
+       qb.name+' leads the league passing race with '+
+       Math.round(num(qb.stats.passYards))+' yards.',[qb.team]));
+   d.qbLeaders[s.year]={playerId:qb.id,week:s.week};
+ }
  d.processedWeeks.push(id);d.processedWeeks=d.processedWeeks.slice(-100);
  return published;
 }
@@ -184,6 +215,23 @@ function seasonEnd(s){
  const d=init(s),existing=d.honors.find(h=>h.year===s.year);
  if(existing)return existing;
  const result=ballot(s);
+ const teams=root.TEAMS?.length||32;
+ for(let t=0;t<teams;t++)
+   teamMark(s,'SEASON_WINS',teamRecord(s,t).w,t,'most regular-season wins');
+ result.champion=d.champions.find(x=>x.year===s.year)||null;
+ result.teamRecords=Object.values(d.teamRecords).filter(x=>x.year===s.year);
+ const awardTypes=[['MVP',result.mvp],['OFFENSIVE_PLAYER',result.offense],
+   ['DEFENSIVE_PLAYER',result.defense],['ROOKIE_OF_THE_YEAR',result.rookie],
+   ...result.allPro.map(p=>['ALL_PRO',p]),
+   ...result.proBowlByConference.flatMap(c=>c.players.map(p=>['PRO_BOWL',p]))];
+ for(const [kind,winner] of awardTypes){
+   if(!winner)continue;
+   const player=s.players.find(p=>String(p.id)===String(winner.id));
+   if(!player)continue;
+   player.careerHonors??=[];
+   if(!player.careerHonors.some(h=>h.year===s.year&&h.kind===kind))
+     player.careerHonors.push({year:s.year,kind,team:player.team,teamName:club(player.team)});
+ }
  result.storylines=d.headlines.filter(x=>x.year===s.year).slice(0,20);
  result.records=[...Object.values(d.allTimeSeasonRecords).filter(x=>x.year===s.year),
    ...Object.values(d.seasonRecords).filter(x=>x.year===s.year)];
@@ -226,7 +274,7 @@ function page(s){
       .filter(([key,r])=>r.team===s.team)),12).map(recordRow).join('')||
      '<div class="card">Your franchise records appear after games.</div>');
 }
-root.GMLeagueNarratives={CONFIG,init,snap,story,record,afterGame,teamRecord,
+root.GMLeagueNarratives={CONFIG,init,snap,story,record,teamMark,championship,afterGame,teamRecord,
  weekly,ballot,seasonEnd,page};
 root.Gridiron?.register?.('leagueNarratives',root.GMLeagueNarratives);
 })(window);
