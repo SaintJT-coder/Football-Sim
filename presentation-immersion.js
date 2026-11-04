@@ -152,14 +152,18 @@ function pressPage(s){
        return '<button class="gm-p7-answer" type="button" onclick="gmPressAnswer(\''+
          q.id+'\',\''+o.id+'\')"><span>'+escape(o.text)+'</span><small>'+
          'Fans '+changeLabel(effect.fan)+' · Media '+changeLabel(effect.media)+
-         ' · Security '+changeLabel(effect.security)+'</small></button>';
+         ' · Security '+changeLabel(effect.security)+
+         (q.playerId!=null?' · Player morale '+changeLabel(effect.morale):'')+
+         '</small></button>';
      }).join('')+'</div></div>';
  })(): '<div class="gm-p7-empty"><div class="gm-p7-emblem">🎙</div><h2>THE MICROPHONES ARE OFF</h2>'+
    '<p>Simulate the next game week to unlock your next three-question conference.'+
    (d.history.length?' Your latest conference is archived below.':'')+'</p></div>';
  return '<section class="gm-p7"><div class="gm-p7-hero"><div class="gm-p7-eyebrow">GRIDIRON NETWORK • MEDIA ROOM</div>'+
    '<h1>THE PRESS ROOM</h1><p>Every answer matters. Shape supporters’ confidence, media pressure and locker-room morale.</p></div>'+
-   summary+active+'<h2 class="gm-p7-heading">CONFERENCE ARCHIVE</h2>'+
+   summary+(gameResults(s).length?'<div class="gm-p7-toolbar">'+
+      btn('REVIEW LAST GAME TAPE',"page='Game Center';render()")+'</div>':'')+
+   active+'<h2 class="gm-p7-heading">CONFERENCE ARCHIVE</h2>'+
    (d.history.slice(0,8).map(m=>'<div class="gm-p7-archive"><b>'+m.year+' • WEEK '+m.week+
      ' • '+escape(m.result)+(m.skipped?' • MISSED':'')+'</b>'+m.answers.map(a=>'<p>“'+escape(a.statement)+'”</p>').join('')+
      '</div>').join('')||'<div class="card">No press conferences completed yet.</div>')+
