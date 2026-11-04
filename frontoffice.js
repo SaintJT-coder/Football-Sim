@@ -23,8 +23,8 @@ const currentPick=()=>available()[0];
 function scout(id){let f=init(),p=f.prospects.find(x=>x.id===id);if(!p)return;let s=f.scouted[id]||0;if(s>=3)return;let budget=state.upgrades.scoutPoints??20;if(budget<3)return notice('Need 3 scouting points');state.upgrades.scoutPoints=budget-3;f.scouted[id]=s+1;window.GMDraftRealism?.scout(p,state);save();render()}
 function grade(p){const g=window.GMDraftRealism?.publicGrade(p,state);if(g)return g.overall+' ± '+g.margin+' ('+g.confidence+'% confidence)';let s=init().scouted[p.id]||0;return s===0?'?':s===1?Math.round(p.rating/5)*5+' ± 8':s===2?p.rating+' ± 4':p.rating+' OVR'}
 function prospectRows(list,action=true){return list.map(p=>'<div class="card" style="margin:8px 0"><div class="row" style="gap:12px;flex-wrap:wrap"><div><b>'+xp(p.name)+'</b> <span class="pill">'+p.pos+'</span><p class="muted small">Age '+p.age+' · Grade '+grade(p)+' · Projected '+p.projection+' · Athletic '+p.athletic+' · Scout '+(init().scouted[p.id]||0)+'/3</p></div><div><button onclick="scoutProspect(\''+p.id+'\')">Scout</button> '+(action?'<button class="primary" onclick="draftProspect(\''+p.id+'\')">Draft</button>':'')+'</div></div></div>').join('')}
-function aiDraft(pick){const f=init(),pool=f.prospects.filter(p=>!p.drafted);if(!pool.length)return;const positional=Object.fromEntries(allPos.map(pos=>[pos,need(pick.owner,pos)]));const scores=new Map(pool.map(p=>[p.id,window.GMDraftRealism?.draftValue(p,pick.owner,state,positional[p.pos])??(p.rating+p.pot*.2+positional[p.pos]*.45)]));pool.sort((a,b)=>scores.get(b.id)-scores.get(a.id));selectProspect(pool[0],pick)}
-function selectProspect(p,pick){const f=init();if(!p||p.drafted||!pick||pick.used)return false;
+function aiDraft(pick){const f=init(),pool=f.prospects.filter(p=>!p.drafted);if(!pool.length)return;const positional=Object.fromEntries(allPos.map(pos=>[pos,need(pick.owner,pos)]));const scores=new Map(pool.map(p=>[p.id,window.GMDraftRealism?.draftValue(p,pick.owner,state,positional[p.pos])??(p.rating+p.pot*.2+positional[p.pos]*.45)]));pool.sort((a,b)=>scores.get(b.id)-scores.get(a.id));selectProspect(pool[0],pick,false)}
+function selectProspect(p,pick,persist=true){const f=init();if(!p||p.drafted||!pick||pick.used)return false;
  p.drafted=true;pick.used=true;f.draftStarted=true;
  const newId=Math.max(0,...state.players.map(x=>Number(x.id)||0))+1;
  const salary=+(Math.max(.7,5.2-pick.round*.57-pick.slot*.035)).toFixed(2);
@@ -35,7 +35,7 @@ function selectProspect(p,pick){const f=init();if(!p||p.drafted||!pick||pick.use
  else window.GMDraftAdvanced?.draft(rookie,state,pick.round,pick.slot);
  f.draftLog.push({pick:pick.id,team:pick.owner,player:p.name,prospectId:p.id,pos:p.pos,overall:p.rating,round:pick.round,slot:pick.slot});
  state.news.unshift('Draft: '+TEAMS[pick.owner][1]+' selected '+p.name+' ('+p.pos+')');
- save();return true}
+ if(persist)save();return true}
 function draftProspect(id){const f=init(),pick=currentPick();if(!pick)return notice('Draft complete');if(pick.owner!==state.team)return notice('AI team is on the clock. Advance to your pick.');let p=f.prospects.find(x=>x.id===id);if(!p||p.drafted)return;selectProspect(p,pick);render()}
 function advanceDraft(){let f=init(),pick=currentPick();if(!pick)return notice('Draft complete');let count=0;while((pick=currentPick())&&pick.owner!==state.team&&count<f.picks.length){aiDraft(pick);count++}save();render()}
 function autoDraft(){let f=init(),count=0;while(currentPick()&&count<f.picks.length){aiDraft(currentPick());count++}save();render()}
