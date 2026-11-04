@@ -47,7 +47,9 @@ jobs:
                           tests/save-recovery-qa-smoke.js \
                           tests/legacy-save-import-qa-smoke.js \
                           tests/save-storage-order-qa-smoke.js \
-                          tests/startup-save-qa-smoke.js; do
+                          tests/startup-save-qa-smoke.js \
+                          tests/draft-animation-qa-smoke.js \
+                          tests/full-page-startup-qa-smoke.js; do
             echo "::group::Running $testfile"
             node "$testfile"
             result=$?
