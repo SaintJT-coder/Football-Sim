@@ -195,6 +195,7 @@ function endSeasonV2(){
  const runner=final.a===champ?final.b:final.a;
  state.history.push({year:state.year,champ:TEAMS[champ][1],runner:TEAMS[runner??standings[1].i][1]});
  state.champions.push(champ);
+ window.GMLeagueNarratives?.championship(state,champ,runner??standings[1].i);
  const legacyMVP=[...state.players].filter(p=>p.pos==='QB').sort((a,b)=>(b.stats.passYards+b.stats.passTD*20-b.stats.interceptions*35)-(a.stats.passYards+a.stats.passTD*20-a.stats.interceptions*35))[0];
  const leagueHonors=window.GMLeagueNarratives?.seasonEnd(state);
  state.awards.push({year:state.year,mvp:leagueHonors?.mvp?.name||legacyMVP?.name||'—',
