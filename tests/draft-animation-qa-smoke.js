@@ -15,6 +15,8 @@ assert.match(html,/onclick="window\.playDraftAnimationPreview\(\)"/,
  'Animation page must invoke the registered preview action');
 assert.match(draftnight,/window\.showFirstPickBroadcast\(/,
  'The first overall pick must trigger the broadcast');
+assert.match(draftnight,/celebrate\(selected,first\.team/,
+ 'First pick must fall back to the CSS celebration if iframe animation fails');
 assert.doesNotMatch(draftnight,/12 FRANCHISES/,
  'The opening ceremony must not show an outdated league count');
 assert.match(draftnight,/TEAMS\.length\+' FRANCHISES/,
