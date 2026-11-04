@@ -210,12 +210,32 @@ function endSeasonV2(){
  window.GMDraftRealism?.seasonEnd(state);
  window.GMContractEconomy?.seasonEnd(state,contractContext);
  for(const p of state.players){
+  if(p.team===-2)continue; // Already retired; never age or retire a second time.
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
   if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){const retired={...p,retiredYear:state.year};state.retired.push(retired);window.GMSimPresentation?.retirement(state,retired);p.team=-2}
   else if(p.years<=0){p.team=-1;p.years=1}
   if(window.GMDevelopment)GMDevelopment.aging(p);else p.rating=clamp(p.rating+(p.age<27?rand(0,2):p.age>31?rand(-3,0):rand(-1,1)),45,p.pot);
   p.stats={yards:0,td:0,tackles:0,sacks:0};
  }
+ // Older saves may hold retired players in BOTH state.players and state.retired.
+ // Preserve their career snapshots in the archive, but keep them out of the
+ // live player pool and remove historical duplicates by stable player ID.
+ const seenRetirees=new Set();
+ state.retired=(state.retired||[]).filter(p=>{
+   if(!p||p.id==null)return true;
+   const key=String(p.id);
+   if(seenRetirees.has(key))return false;
+   seenRetirees.add(key);
+   return true;
+ });
+ for(const p of state.players)if(p.team===-2){
+   const key=p.id==null?null:String(p.id);
+   if(key!==null&&!seenRetirees.has(key)){
+     state.retired.push({...p,retiredYear:p.retiredYear||state.year});
+     seenRetirees.add(key);
+   }
+ }
+ state.players=state.players.filter(p=>p.team!==-2);
  window.GMSimPresentation?.season(state);
  state.year++;state.week=1;state.results=[];
  window.GMContractEconomy?.advanceYear(state);
