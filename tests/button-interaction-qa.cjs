@@ -66,6 +66,44 @@ const {chromium}=require('playwright');
        if(actual!==tab)failures.push('Nav "'+tab+'" stays on "'+actual+'"');
      }catch(e){failures.push('Nav "'+tab+'": '+e.message)}
    }
+   // Exercise real clickable game actions; render-only and callback-existence tests
+   // cannot catch controls that silently fail after user interaction.
+   const liveChecks=[];
+   async function openTab(tab){
+     await page.evaluate(label=>{page=label;render()},tab);
+   }
+   await openTab('Dashboard');
+   const homeText=await page.locator('#app').innerText();
+   await page.locator('#app button[onclick="commandTab(\'NEWS\')"]').click();
+   const newsText=await page.locator('#app').innerText();
+   if(homeText===newsText)failures.push('Dashboard NEWS tab did not change the content');
+   else liveChecks.push('Dashboard NEWS');
+   await openTab('Schedule');
+   await page.locator('#app button[onclick="gameplanSet(\'offense\',\'PASS HEAVY\')"]').click();
+   const offense=await page.evaluate(()=>state.gameplay?.offense);
+   if(offense!=='PASS HEAVY')failures.push('Schedule offensive game-plan did not save: '+offense);
+   else liveChecks.push('Schedule offensive strategy');
+   await openTab('Roster Rules');
+   await page.locator('#app button[onclick="gmRosterTab=\'PRACTICE\';render()"]').click();
+   const rosterTab=await page.evaluate(()=>window.gmRosterTab);
+   if(rosterTab!=='PRACTICE')failures.push('Roster Rules PRACTICE tab did not activate');
+   else liveChecks.push('Roster rules tabs');
+   await openTab('Owner Goals');
+   const cashBefore=await page.evaluate(()=>state.cash);
+   await page.locator('#app button[onclick="gmOwnerUpgrade(\'training\')"]').click();
+   const cashAfter=await page.evaluate(()=>state.cash);
+   if(!(cashAfter<cashBefore))failures.push('Owner training upgrade did not deduct cash');
+   else liveChecks.push('Owner training upgrade');
+   await openTab('Game Plan & Practice');
+   const weeklyFocus=page.locator('#app button[onclick^="gmWeeklyFocus("]').first();
+   if(await weeklyFocus.count()){
+     await weeklyFocus.click();
+     liveChecks.push('Weekly practice focus');
+   }else failures.push('Weekly practice focus button unavailable');
+   await openTab('Advanced Scouting');
+   await page.locator('#app button[onclick="gmScoutPosition(\\\"QB\\\")"]').click();
+   liveChecks.push('Advanced scouting position filter');
+   console.log('LIVE ACTION CHECKS '+JSON.stringify(liveChecks));
    console.log('BUTTON COUNTS '+JSON.stringify(counts));
    console.log('BUTTON SAMPLES '+JSON.stringify(samples));
    console.log('CONTROL FAILURES '+JSON.stringify(failures.slice(0,100),null,2));
