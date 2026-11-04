@@ -276,10 +276,17 @@ function decideFifthYear(p,s,exercise,automatic=false){
    const year=o.optionYear;
    const forecast=root.GMContractEconomy?.sheet(s,s.team,year);
    const alreadySalary=(c?.baseSalaries?.[year-c.startYear]||0);
-   if(forecast&&forecast.space+alreadySalary<o.salary)
-     return {ok:false,error:'Fifth-year option exceeds projected '+year+' cap room'};
-   c.baseSalaries.push(o.salary);c.bonusProration.push(0);c.guarantees.push(o.salary);
-   p.years=(p.years||1)+1;
+   const alreadyCovered=c.startYear+c.baseSalaries.length>year;
+   const capBlocked=forecast&&forecast.space+alreadySalary<o.salary;
+   if(alreadyCovered||capBlocked){
+     if(!automatic)return {ok:false,error:alreadyCovered?
+       'Player contract already covers the option season':
+       'Fifth-year option exceeds projected '+year+' cap room'};
+     exercise=false; // Conservative offseason fallback: decline an unaffordable or redundant option.
+   }else{
+     c.baseSalaries.push(o.salary);c.bonusProration.push(0);c.guarantees.push(o.salary);
+     p.years=(p.years||1)+1;
+   }
  }
  o.decided=true;o.exercised=!!exercise;o.decidedYear=s.year;
  s.news?.unshift(p.name+' fifth-year option '+(exercise?'EXERCISED':'DECLINED')+
@@ -292,7 +299,7 @@ function seasonEnd(s){
    if(!o||o.decided||o.deadlineYear>s.year||p.team<0)continue;
    const exercise=p.rating>=CONFIG.fifthYear.exerciseMinRating;
    if(p.team===s.team){ // Automatic conservative fallback if user did not choose.
-     const result=decideFifthYear(p,s,exercise,true);if(result.ok)changes.push({playerId:p.id,exercise,auto:true});
+     const result=decideFifthYear(p,s,exercise,true);if(result.ok)changes.push({playerId:p.id,exercise:result.exercised,auto:true});
    }else{
      o.decided=true;o.exercised=exercise;o.decidedYear=s.year;
      if(exercise){
