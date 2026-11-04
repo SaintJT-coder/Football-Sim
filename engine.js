@@ -213,7 +213,11 @@ function endSeasonV2(){
   if(p.team===-2)continue; // Already retired; never age or retire a second time.
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
   if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){const retired={...p,retiredYear:state.year};state.retired.push(retired);window.GMSimPresentation?.retirement(state,retired);p.team=-2}
-  else if(p.years<=0){p.team=-1;p.years=1}
+  else if(p.years<=0){
+    if(p.team>=0){p.lastContractTeam=p.team;p.freeAgentSince=state.year}
+    else p.freeAgentSince??=state.year;
+    p.team=-1;p.years=1;
+  }
   if(window.GMDevelopment)GMDevelopment.aging(p);else p.rating=clamp(p.rating+(p.age<27?rand(0,2):p.age>31?rand(-3,0):rand(-1,1)),45,p.pot);
   p.stats={yards:0,td:0,tackles:0,sacks:0};
  }
@@ -236,6 +240,7 @@ function endSeasonV2(){
    }
  }
  state.players=state.players.filter(p=>p.team!==-2);
+ window.GMLeaguePlayerLifecycle?.prune(state);
  window.GMSimPresentation?.season(state);
  state.year++;state.week=1;state.results=[];
  window.GMContractEconomy?.advanceYear(state);
