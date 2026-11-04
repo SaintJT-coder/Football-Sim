@@ -7,7 +7,8 @@ const CONFIG={
    noise:7,minRating:52,maxRating:86,potentialMin:3,potentialMax:17},
  scouting:{baseAccuracy:.28,scoutPerPoint:.16,staffPerPoint:.003,
    facilityPerTier:.04,maxAccuracy:.96,initialError:15,confidencePerPoint:19,
-   combineAccuracy:.07,proDayAccuracy:.06,workoutAccuracy:.09,scoreCost:3},
+   combineAccuracy:.07,proDayAccuracy:.06,workoutAccuracy:.09,scoreCost:3,
+   privateWorkoutVariance:2},
  resources:{proDays:8,combineReview:24,privateWorkouts:8},
  combine:{fortyBase:4.54,fortySpread:.49,verticalBase:31,verticalSpread:15,
    benchBase:14,benchSpread:22,shuttleBase:4.15,shuttleSpread:.50,
@@ -54,7 +55,7 @@ function create(s,i){
   projection:0,tier:Math.max(1,Math.min(7,Math.ceil((87-overall)/6)))};
  p.draftRealism={version:1,trueAttributes:attrs,hiddenOverall:overall,
   initialError:Math.round((r()-.5)*CONFIG.scouting.initialError*2),
-  combine:null,proDay:null,scoutingAccuracy:CONFIG.scouting.baseAccuracy,
+  combine:null,proDay:null,workoutReports:[],scoutingAccuracy:CONFIG.scouting.baseAccuracy,
   reviews:0,gradeShift:0};
  p.projection=estimated(p,s);return p;
 }
@@ -65,7 +66,7 @@ function enrich(p,s){
    for(const stat of POS_WEIGHTS[p.pos]||[])attrs[stat]=clamp(base+Math.round((r()-.5)*18),35,99);
    p.draftRealism={version:1,trueAttributes:attrs,hiddenOverall:base,
      initialError:Math.round((r()-.5)*CONFIG.scouting.initialError*2),
-     combine:null,proDay:null,scoutingAccuracy:CONFIG.scouting.baseAccuracy,
+     combine:null,proDay:null,workoutReports:[],scoutingAccuracy:CONFIG.scouting.baseAccuracy,
      reviews:0,gradeShift:0};
  }
  p.projection=estimated(p,s);
@@ -126,7 +127,7 @@ function combine(p,s){
  }
  d.combineShift??=clamp(Math.round(((p.athletic||70)-70)/12),
    -CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
- d.gradeShift=clamp(d.combineShift+(d.proDay?.gradeShift||0),
+ d.gradeShift=clamp(d.combineShift+(d.proDay?.gradeShift||0)+(d.workoutShift||0),
    -CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
  p.projection=estimated(p,s);
  return d.combine;
@@ -139,8 +140,8 @@ function proDay(p,s){
  res.proDays--;
  const r=rng('proday:'+s.year+':'+p.id);
  const delta=Math.round((r()-.5)*5);
- d.proDay={year:s.year,gradeShift:delta,medicalVerified:r()>.13};
- d.gradeShift=clamp((d.combineShift||0)+delta,
+ d.proDay={year:s.year,gradeShift:delta,medicalVerified:r()>CONFIG.risk.medicalRate};
+ d.gradeShift=clamp((d.combineShift||0)+delta+(d.workoutShift||0),
    -CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
  p.projection=estimated(p,s);
  return {ok:true,report:d.proDay,grade:p.projection};
@@ -150,9 +151,15 @@ function workout(p,s){
  if(res.privateWorkouts<=0)return {ok:false,error:'No private workouts remaining'};
  if(d.reviews>=3)return {ok:false,error:'Maximum three workouts per prospect'};
  res.privateWorkouts--;
- d.reviews++;
+ const r=rng('private:'+s.year+':'+p.id+':'+d.reviews);
+ const delta=Math.round((r()-.5)*2*CONFIG.scouting.privateWorkoutVariance);
+ d.reviews++;d.workoutReports??=[];
+ d.workoutReports.push({year:s.year,review:d.reviews,gradeShift:delta});
+ d.workoutShift=(d.workoutShift||0)+delta;
+ d.gradeShift=clamp((d.combineShift||0)+(d.proDay?.gradeShift||0)+d.workoutShift,
+    -CONFIG.combine.gradeShiftLimit,CONFIG.combine.gradeShiftLimit);
  p.projection=estimated(p,s);
- return {ok:true,grade:p.projection,accuracy:accuracy(p,s),workouts:d.reviews};
+ return {ok:true,grade:p.projection,accuracy:accuracy(p,s),workouts:d.reviews,variance:delta};
 }
 function resources(s){
  const d=s.draftRealismResources??={year:s.year,proDays:CONFIG.resources.proDays,
