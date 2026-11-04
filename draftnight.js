@@ -68,9 +68,17 @@ function firstPickCutscene(f,before){
  const first=f.draftLog[0];
  if(first.round!==1)return false;
  const prospect=f.prospects.find(x=>first.prospectId?x.id===first.prospectId:x.name===first.player);
- if(typeof window.showFirstPickBroadcast!=='function')return false;
  close();
- window.showFirstPickBroadcast(prospect||first,TEAMS[first.team]?.[1]||TEAMS[first.team]?.[0]||'DRAFT TEAM',state.year,f.prospects);
+ if(typeof window.showFirstPickBroadcast==='function'){
+   try{
+     if(window.showFirstPickBroadcast(prospect||first,
+       TEAMS[first.team]?.[1]||TEAMS[first.team]?.[0]||'DRAFT TEAM',
+       state.year,f.prospects)!==false)return true;
+   }catch(error){console.warn('First-pick canvas unavailable; using celebration fallback',error)}
+ }
+ // Never lose the draft announcement if a mobile browser rejects iframe animation.
+ const selected=prospect||{name:first.player,pos:first.pos,rating:first.overall,dev:'ROOKIE'};
+ celebrate(selected,first.team,{round:first.round,slot:first.slot||1});
  return true;
 }
 window.draftProspect=function(id){
