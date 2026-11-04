@@ -55,7 +55,7 @@ const {chromium}=require('playwright');
      ()=>typeof cycle==='number'&&cycle>0.08,null,{timeout:8000}
    ).then(()=>true).catch(()=>false);
    if(!started)throw Error('Draft canvas was visible but its frame clock did not advance');
-   await overlay.locator('button').click();
+   await overlay.getByRole('button',{name:/CONTINUE DRAFT/}).click();
    await overlay.waitFor({state:'detached'});
 
    // The simulation now plays sixteen games per week across 32 teams.
