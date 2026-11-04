@@ -132,3 +132,26 @@ The full headless draft was executed with a synthetic 32-team, 960-player league
 A full interactive browser/iPad playthrough and deployment check have not been performed.
 
 **Priority 6 — League Narratives & Records — remains untouched by this change.**
+
+
+## November 4, 2026 — Integration and usability hardening
+
+The existing Priority 5 foundation was retained. These improvements are committed to the same vanilla-JavaScript modules:
+
+- **Complete class coverage:** 280 prospects for 224 selections, evenly distributed across all ten positions. A legacy, partially generated 130-player class is filled to seven-round capacity even if drafting has already started. Generation runs once per season rather than on every mobile render.
+- **Accessible scouting pages:** Advanced Scouting and Draft Combine now include position filters and page navigation. All prospects remain accessible without dumping 280 cards onto an iPad at once. Prospect-ID arguments in button handlers are HTML-escaped, so IDs such as rookie-2026-0 function when tapped.
+- **Accuracy and variance:** User scouting staff quality (supported scouting staff rating fields), owner Scouting Department tier (+4 percentage points per tier), scouting points, Combine, Pro Day and private workouts all affect grading confidence. Combine and Pro Day grade movements are independent; private workouts record deterministic, small variance and cannot run more than three times for the same prospect. Published grades remain imperfect.
+- **Draft pick chart:** Pick values use a tunable, historical-style descending chart rather than a single power law. Anchor values are 3,000 (pick 1), 590 (pick 32), 270 (pick 64), 116 (pick 96), 44 (pick 128), 28 (pick 160), 16 (pick 192), and 2 (pick 224), linearly interpolated between anchors. These are game-balance approximations, not a binding real NFL trade calculator.
+- **Draft-day trade UI:** The new Pick Swap Builder supports up to six picks on either side, offers a quote before execution, incorporates the partner's roster needs and an 8% AI premium, rejects duplicate or unavailable picks, and transfers ownership only on an accepted offer. It shows the pick owner and value in a mobile-friendly layout.
+- **First-round fifth-year options:** Their deadline is the third year (draft class 2026 → decision due 2028 Week 18) for a conditional 2030 season. Unaffordable, redundant or already-extended options do not corrupt contract data. A missed user decision is handled conservatively at offseason rollover, automatically declining unaffordable options.
+- **Integration consistency:** Roster Rules and the advanced scouting trade preview use the same pick values and acceptance margin as the draft module.
+
+### Testing
+
+The current repository sources passed the Priority 5 regression suite, including a complete 224-pick auto-draft, a 280-player prospect pool, 32 first-round option records, quote and actual ownership transfers, the trade-builder UI, Combine/Pro Day/workout limits, string-ID click handler markup, and option-deadline checks. Additional targeted tests confirmed year-five cap safeguards and automatic fallback.
+
+Run from a local checkout:
+
+    node tests/draft-priority5-smoke.js
+
+**Design limitation:** Because saves and the prospect pool live entirely in client-side JavaScript/localStorage, hidden ratings are hidden from ordinary player screens, not cryptographically secret from someone inspecting browser storage or source code. True secrecy requires a server-side draft database. The current system intentionally prioritizes offline save compatibility.
