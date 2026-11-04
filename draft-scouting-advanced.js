@@ -29,7 +29,7 @@ function page(s){
  '<p class="sub">Interviews '+r.interviews+' · Medical '+r.medical+' · Workouts '+r.workouts+
  ' · '+filtered.length+' available prospects · Page '+(ui.page+1)+'/'+(last+1)+'</p>'+
  '<div class="filters">'+positions.map(pos=>'<button class="'+(pos===ui.position?'selected':'')+
- '" onclick="gmScoutPosition('+JSON.stringify(pos)+')">'+pos+'</button>').join('')+'</div>'+
+ '" onclick="gmScoutPosition('+safe(JSON.stringify(pos))+')">'+pos+'</button>').join('')+'</div>'+
  '<div class="filters"><button '+(ui.page<=0?'disabled ':'')+'onclick="gmScoutPage(-1)">PREVIOUS</button>'+
  '<button '+(ui.page>=last?'disabled ':'')+'onclick="gmScoutPage(1)">NEXT</button></div>'+
  (visible.map(p=>{const e=ensure(p),g=root.GMDraftRealism?.publicGrade(p,s);
@@ -38,9 +38,9 @@ function page(s){
       Math.round(p.projection||65))+'</p>'+
    '<p>Character '+(e.interviewed?JSON.stringify(e.character):'Not interviewed')+'</p>'+
    '<p>Medical '+(e.medicalReviewed?safe(e.medicalFlag):'Not evaluated')+'</p>'+
-   '<button onclick="gmScoutAction('+JSON.stringify(String(p.id))+',\'interview\')">INTERVIEW</button> '+
-   '<button onclick="gmScoutAction('+JSON.stringify(String(p.id))+',\'medical\')">MEDICAL</button> '+
-   '<button onclick="gmScoutAction('+JSON.stringify(String(p.id))+',\'workout\')">PRIVATE WORKOUT</button></div>';
+   '<button onclick="gmScoutAction('+safe(JSON.stringify(String(p.id)))+',\'interview\')">INTERVIEW</button> '+
+   '<button onclick="gmScoutAction('+safe(JSON.stringify(String(p.id)))+',\'medical\')">MEDICAL</button> '+
+   '<button onclick="gmScoutAction('+safe(JSON.stringify(String(p.id)))+',\'workout\')">PRIVATE WORKOUT</button></div>';
  }).join('')||'<div class="card">No eligible prospects in this position.</div>')+
  '<div class="filters"><button '+(ui.page<=0?'disabled ':'')+'onclick="gmScoutPage(-1)">PREVIOUS</button>'+
  '<button '+(ui.page>=last?'disabled ':'')+'onclick="gmScoutPage(1)">NEXT</button></div>';
