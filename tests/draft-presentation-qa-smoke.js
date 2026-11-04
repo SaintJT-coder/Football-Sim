@@ -90,6 +90,7 @@ state.year=2027;scope.render();
 assert.ok(elements['dn-intro'],'Next year did not receive its own intro');
 scope.closeDraftIntro();
 state.year=2026;
+scope.render(); // Refresh the draft class after deliberately switching test seasons.
 
 // A normal first overall pick must save exactly once and play its cutscene.
 const before=saves;
