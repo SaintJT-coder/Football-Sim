@@ -13,10 +13,35 @@ jobs:
         with:
           node-version: '22'
       - name: Check source syntax and module dependencies
-        run: node tests/source-smoke.cjs
+        run: |
+          node tests/source-smoke.cjs
+          node tests/named-slot-quota-qa-smoke.cjs
       - name: Install browser test dependency
         run: npm install --no-save playwright
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
+      - name: Verify public GitHub Pages delivery
+        run: |
+          python3 - <<'PY'
+          import urllib.request,urllib.error,hashlib,pathlib
+          base='https://saintjt-coder.github.io/Football-Sim/'
+          for name in ['index.html','gridiron-core.js','menu.js','engine.js','presentation-immersion.js','gameplay.js','dashboard.js']:
+              url=base+name
+              try:
+                  with urllib.request.urlopen(urllib.request.Request(url,headers={'User-Agent':'Gridiron-QA','Cache-Control':'no-cache'}),timeout=15) as resp:
+                      body=resp.read()
+                      local=pathlib.Path(name).read_bytes()
+                      match=hashlib.sha256(body).digest()==hashlib.sha256(local).digest()
+                      print('LIVE',resp.status,url,'bytes='+str(len(body)),'matches_checkout='+str(match))
+                      if not match:
+                          print('SOURCE BYTES',len(local),'LIVE BYTES',len(body))
+                      assert resp.status==200 and len(body)>0 and match, 'Production site is serving stale or modified source: '+name
+              except Exception as error:
+                  print('LIVE DELIVERY FAILURE',url,repr(error))
+                  raise
+          PY
       - name: Run existing mobile browser regression
-        run: node tests/smoke.cjs
+        run: |
+          node tests/smoke.cjs
+          node tests/button-interaction-qa.cjs
+          BROWSER=webkit node tests/button-interaction-qa.cjs

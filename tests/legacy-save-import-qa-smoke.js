@@ -39,7 +39,8 @@ assert.equal(original.year,2026);
 assert.equal(second.team,5);
 const active=M.activate(second.id);
 assert.equal(active.year,2027);
-assert.equal(JSON.parse(storage.get('gridiron-gm-save')).team,5);
+assert.equal(storage.get('gridiron-gm-save'),undefined,'Activated named save should not create duplicate mirror');
+assert.equal(JSON.parse(storage.get('gridiron-gm-slot-v3:'+second.id)).team,5);
 M.remove(original.id);
 assert.equal(M.legacyPending().length,0,
  'Deleted imported slots must not be recreated from old source');

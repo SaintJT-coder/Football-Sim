@@ -64,14 +64,14 @@ assert.equal(first.manager.index().length,1);
 assert.equal(first.manager.index()[0].name,'West Coast Dynasty');
 const firstId=first.manager.activeId();
 assert.ok(firstId);
-assert.equal(JSON.parse(storage.get('gridiron-gm-save')).team,0);
+assert.equal(storage.get('gridiron-gm-save'),undefined,'Named franchise must not store a duplicate mirror');
 
 const alternate=makeState(7,2029);
 const entry=first.manager.create(alternate,'Second Dynasty');
 assert.notEqual(entry.id,firstId);
 assert.equal(first.manager.index().length,2);
-assert.equal(JSON.parse(storage.get('gridiron-gm-save')).team,0,
-  'Setup requires a deliberately stale legacy mirror');
+// Deliberately seed a stale legacy mirror to verify named saves still win.
+storage.set('gridiron-gm-save',JSON.stringify(makeState(0,2026)));
 
 // A cold reload must load the selected named slot, not the stale mirror.
 const second=makeRuntime(storage,JSON.parse(storage.get('gridiron-gm-save')));
@@ -84,6 +84,8 @@ assert.match(second.nodes['gm-menu'].innerHTML,/CONTINUE FRANCHISE/);
 
 // Corrupt active slot: recover a different valid named slot without deleting data.
 storage.set('gridiron-gm-slot-v3:'+entry.id,'{"broken":true}');
+// Restore may have cleaned the old compatibility copy; seed the legacy fallback again.
+storage.set('gridiron-gm-save',JSON.stringify(makeState(0,2026)));
 const third=makeRuntime(storage,JSON.parse(storage.get('gridiron-gm-save')));
 assert.equal(third.manager.activeId(),firstId);
 assert.equal(third.scope.state.team,0);

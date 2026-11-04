@@ -6,6 +6,14 @@ const clone=v=>JSON.parse(JSON.stringify(v));
 // The named slot is canonical. A compatibility mirror is best-effort because
 // a second full JSON copy can exceed Safari/Chromium localStorage quota.
 function writeMirror(value){
+ // Once a valid named slot exists, a second full JSON copy is unnecessary.
+ // Large duplicate mirrors can fill Safari's quota and make save-before-render
+ // button handlers appear dead; never recreate them for named franchises.
+ const current=activeId();
+ if(current&&index().some(x=>x.id===current)&&localStorage.getItem(PREFIX+current)!==null){
+   try{localStorage.removeItem(KEY)}catch{}
+   return false;
+ }
  try{localStorage.setItem(KEY,JSON.stringify(value));return true}
  catch(error){
    if(error?.name!=='QuotaExceededError'&&!/quota/i.test(String(error?.message)))throw error;
@@ -23,7 +31,11 @@ function restore(){
  const slotId=activeId();
  if(!slotId||!index().some(x=>x.id===slotId))return null;
  const data=read(PREFIX+slotId);
- return valid(data)?clone(data):null;
+ if(!valid(data))return null;
+ // Only release the compatibility copy AFTER verifying the canonical data.
+ // This ensures old browser saves remain recoverable if the slot is corrupt.
+ try{localStorage.removeItem(KEY)}catch{}
+ return clone(data);
 }
 const meta=(s,name,branchOf)=>({name:String(name||'Franchise').slice(0,80),year:s.year,week:s.week,team:s.team,lastPlayed:new Date().toISOString(),branchOf:branchOf||null});
 function write(s,name,slotId,branchOf){if(!valid(s))throw Error('Invalid franchise state');const key=slotId||id(),entries=index(),previous=entries.find(x=>x.id===key);const info={id:key,...meta(s,name||previous?.name,branchOf===undefined?previous?.branchOf:branchOf)};localStorage.setItem(PREFIX+key,JSON.stringify(s));const updated=[info,...entries.filter(x=>x.id!==key)];localStorage.setItem(INDEX,JSON.stringify(updated));return info}
