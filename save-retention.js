@@ -3,7 +3,7 @@
    No binary compression or schema migration: old JSON saves remain valid. */
 (function(root){
 'use strict';
-const CONFIG={aiTrainingHistory:3,aiSnapHistory:2,aiEventHistory:2,newsEntries:500};
+const CONFIG={aiTrainingHistory:1,aiSnapHistory:0,aiEventHistory:1,newsEntries:500};
 function trim(arr,maximum){
  if(!Array.isArray(arr)||arr.length<=maximum)return 0;
  const removed=arr.length-maximum;arr.length=maximum;return removed;
