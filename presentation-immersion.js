@@ -275,6 +275,110 @@ function injuryPage(s){
    }).join('')||'<div class="gm-p7-empty"><h2>NO ACTIVE INJURIES</h2>'+
      '<p>Everyone currently listed in this scope is available.</p></div>')+'</section>';
 }
+
+function gameResults(s){
+ const archive=root.GMSimPresentation?.init(s)?.gameReports||[],byId=new Map();
+ for(const g of (s.results||[])){
+   if(g.a!==s.team&&g.b!==s.team)continue;
+   const key=[g.year,g.week,g.a,g.b].join(':');
+   byId.set(key,{id:key,year:g.year,week:g.week,a:g.a,b:g.b,
+     sa:g.sa,sb:g.sb,report:g.report||null,news:null,leaders:[],storylines:[]});
+ }
+ for(const g of archive){
+   if(g.a!==s.team&&g.b!==s.team)continue;
+   const previous=byId.get(g.id);
+   byId.set(g.id,{...previous,...g,report:previous?.report||g.originalReport||null,
+     news:g.narrative||g.headline||null});
+ }
+ return [...byId.values()].sort((a,b)=>b.year-a.year||b.week-a.week)
+   .slice(0,CONFIG.gameCenter.maxGames);
+}
+function selectGame(s,id){
+ const target=gameResults(s).find(g=>g.id===String(id));
+ if(!target)return {ok:false,error:'This game report is no longer in the local archive'};
+ s.immersionGameView??={};
+ s.immersionGameView.id=target.id;
+ s.immersionGameView.year=target.year;
+ return {ok:true,id:target.id};
+}
+function gameCenterPage(s){
+ const all=gameResults(s),years=[...new Set(all.map(g=>g.year))].sort((a,b)=>b-a);
+ const v=s.immersionGameView??={year:years[0]??s.year,id:null};
+ if(!years.includes(Number(v.year)))v.year=years[0]??s.year;
+ const games=all.filter(g=>g.year===Number(v.year));
+ const selected=games.find(g=>g.id===v.id)||games[0];
+ const score=(p,h)=>'<div class="gm-p7-game-team '+(h?'home':'away')+'">'+
+   '<small>'+escape(root.TEAMS?.[p.team]?.[0]||'TEAM')+'</small>'+
+   '<strong>'+escape(name(p.team))+'</strong><b>'+p.points+'</b></div>';
+ const gameButton=g=>{
+   const isSelected=selected?.id===g.id;
+   const won=(g.sa>g.sb?g.a:g.b)===s.team;
+   return '<button type="button" class="gm-p7-game-picker '+(isSelected?'selected':'')+
+     '" onclick="gmImmersionSelectGame('+escape(JSON.stringify(g.id))+')">'+
+     '<span>WEEK '+g.week+' • '+(won?'W':'L')+'</span><b>'+escape(name(g.a))+
+     ' '+g.sa+' – '+g.sb+' '+escape(name(g.b))+'</b></button>';
+ };
+ const stats=selected?.report?.teams||[];
+ const teamStat=(team,key)=>stats.find(x=>x.team===team)?.[key]??'—';
+ const statRows=[['TOTAL YARDS','totalYards'],['PASSING YARDS','passYards'],
+   ['RUSHING YARDS','rushYards'],['TURNOVERS','turnovers']];
+ const quarter=selected?.report?.quarters,quarterLabels=CONFIG.gameCenter.quarterLabels;
+ const qTable=quarter?.home?.length===4&&quarter?.away?.length===4?
+   '<div class="gm-p7-scorecard"><div class="gm-p7-quarter-head"><span>QUARTER</span>'+
+   quarterLabels.map(x=>'<b>'+x+'</b>').join('')+'<b>FINAL</b></div>'+
+   [[selected.a,quarter.home,selected.sa],[selected.b,quarter.away,selected.sb]]
+     .map(([team,values,total])=>'<div class="gm-p7-quarter-row"><span>'+
+       escape(root.TEAMS?.[team]?.[0]||name(team))+'</span>'+
+       values.map(v=>'<b>'+v+'</b>').join('')+'<strong>'+total+'</strong></div>').join('')+
+   '</div>':'<p class="muted">Quarter-by-quarter data was not recorded for this game.</p>';
+ const press=(s.simPresentation?.pressConferences||[]).find(p=>p.id===selected?.id);
+ const short=(g)=>g?((g.sa>g.sb?g.a:g.b)===s.team?'VICTORY':'DEFEAT'):'NO GAME';
+ const box=selected?'<div class="gm-p7-scoreboard"><div class="gm-p7-eyebrow">'+
+   selected.year+' • WEEK '+selected.week+' • '+short(selected)+'</div>'+
+   '<div class="gm-p7-scoreline">'+score({team:selected.a,points:selected.sa},true)+
+     '<span class="gm-p7-score-separator">FINAL</span>'+
+     score({team:selected.b,points:selected.sb},false)+'</div>'+
+   '<p>'+escape(selected.news||selected.report?.summary||'Final score is recorded for this matchup.')+'</p>'+
+   (selected.report?.weather?'<div class="gm-p7-weather">GAME CONDITIONS • '+
+     escape(selected.report.weather)+'</div>':'')+'</div>'+
+   '<h2 class="gm-p7-heading">QUARTER-BY-QUARTER</h2>'+qTable+
+   '<h2 class="gm-p7-heading">TEAM STAT COMPARISON</h2>'+
+   '<div class="gm-p7-scorecard">'+statRows.map(([label,key])=>
+     '<div class="gm-p7-stat-line"><b>'+teamStat(selected.a,key)+'</b><span>'+
+     label+'</span><b>'+teamStat(selected.b,key)+'</b></div>').join('')+
+     '<div class="gm-p7-stat-line"><b>'+
+       (teamStat(selected.a,'thirdDownConversions')==='—'?'—':
+         teamStat(selected.a,'thirdDownConversions')+'/'+teamStat(selected.a,'thirdDownAttempts'))+
+       '</b><span>THIRD DOWNS</span><b>'+
+       (teamStat(selected.b,'thirdDownConversions')==='—'?'—':
+         teamStat(selected.b,'thirdDownConversions')+'/'+teamStat(selected.b,'thirdDownAttempts'))+
+       '</b></div></div>'+
+   '<h2 class="gm-p7-heading">GAME STORYLINES</h2>'+
+   '<div class="gm-p7-game-stories">'+
+   ((selected.storylines||[]).map(x=>'<span>'+escape(x)+'</span>').join('')||
+     '<span>FINAL RESULT</span>')+'</div>'+
+   (selected.leaders?.length?'<h2 class="gm-p7-heading">FEATURED PLAYERS</h2><div class="gm-p7-review-grid">'+
+       selected.leaders.slice(0,CONFIG.gameCenter.maxLeaders).map(p=>
+         '<div class="gm-p7-review-card"><small>'+escape(p.pos||'PLAYER')+'</small>'+
+         '<h3>'+escape(p.name)+'</h3><p>Overall '+Number(p.rating||0)+
+         ' • '+escape(name(p.team))+'</p></div>').join('')+'</div>':'')+
+   (selected.report?.keyInjuries?.length?'<h2 class="gm-p7-heading">MEDICAL REPORT</h2>'+
+     selected.report.keyInjuries.slice(0,CONFIG.gameCenter.maxInjuryNotes).map(p=>
+       '<div class="gm-p7-story"><h3>'+escape(p.name)+'</h3><p>'+
+       escape(name(p.team))+' • '+Number(p.weeks||0)+' estimated weeks</p></div>').join(''):'')+
+   (press?'<h2 class="gm-p7-heading">POSTGAME MEDIA REACTION</h2><div class="gm-p7-archive">'+
+     press.quotes.map(q=>'<p><b>'+escape(q.speaker)+':</b> “'+escape(q.text)+'”</p>').join('')+
+     '</div>':''):'<div class="gm-p7-empty"><h2>THE SEASON AWAITS</h2>'+
+     '<p>Simulate a game to see authentic quarter scoring, real game statistics and media reactions.</p></div>';
+ return '<section class="gm-p7"><div class="gm-p7-hero"><div class="gm-p7-eyebrow">GRIDIRON NETWORK • WEEKLY GAME CENTER</div>'+
+   '<h1>THE FILM ROOM</h1><p>Scoreboards, quarter totals, team efficiency, key player features and press reaction—built only from the results your franchise actually simulated.</p></div>'+
+   '<div class="gm-p7-toolbar"><label>SEASON <select onchange="gmImmersionGameYear(this.value)">'+
+   years.map(y=>'<option value="'+y+'"'+(y===Number(v.year)?' selected':'')+'>'+y+'</option>').join('')+
+   '</select></label><button type="button" onclick="page=\'Press Room\';render()">PRESS ROOM</button></div>'+
+   '<div class="gm-p7-game-list">'+games.map(gameButton).join('')+'</div>'+box+
+   '</section>';
+}
+
 function yearReview(s,rec,previous){
  const mine=rec.standings?.find(x=>x.team===rec.team)||{wins:0,losses:0};
  const prior=previous?.standings?.find(x=>x.team===rec.team);
@@ -368,12 +472,17 @@ function yearPage(s,selected){
    '</section>';
 }
 const api={CONFIG,pressStore,openConference,afterWeek,respond,pressPage,
- status,depthData,setStarter,depthPage,injuryPage,yearReview,yearPage};
+ status,depthData,setStarter,depthPage,injuryPage,gameResults,selectGame,gameCenterPage,yearReview,yearPage};
 root.GMImmersion=api;root.Gridiron?.register?.('presentationImmersion',api);
 root.gmPressAnswer=(question,choice)=>{const result=respond(state,question,choice);
  if(!result.ok)alert(result.error);else{save();render()}};
 root.gmImmersionStarter=(pos,id)=>{const result=setStarter(state,pos,id);
  if(!result.ok)alert(result.error);else{save();render()}};
+root.gmImmersionSelectGame=id=>{const result=selectGame(state,id);
+ if(!result.ok)alert(result.error);else render()};
+root.gmImmersionGameYear=year=>{const y=Number(year),years=gameResults(state).map(x=>x.year);
+ if(!Number.isInteger(y)||!years.includes(y))return;
+ state.immersionGameView={year:y,id:null};render()};
 root.gmImmersionInjuryAll=false;
 root.gmImmersionInjuryScope=all=>{root.gmImmersionInjuryAll=!!all;render()};
 root.gmImmersionYear=year=>{root.gmImmersionSelectedYear=year;render()};
@@ -381,12 +490,13 @@ root.pressConference=()=>{page='Press Room';render()};
 const previousRender=render;
 render=function(){
  if(page==='Press Room'||page==='Depth Chart'||page==='Injury Report'||
-    page==='Season Recaps'){
+    page==='Season Recaps'||page==='Game Center'){
    root.GMRelocation?.applyTeamIdentity(state);
    nav();$('mobileSeason').textContent=state.year+' W'+state.week;
    $('app').innerHTML=page==='Press Room'?pressPage(state):
      page==='Depth Chart'?depthPage(state):
      page==='Injury Report'?injuryPage(state):
+     page==='Game Center'?gameCenterPage(state):
      yearPage(state,root.gmImmersionSelectedYear);
    return;
  }
