@@ -42,9 +42,18 @@ const noise=(m=1)=> (Math.random()+Math.random()+Math.random()-1.5)*m;
 const points=(off,def,home)=>clamp(Math.round(23+(off-def)*.6+noise(17)+(home?1.5:0)),3,56);
 const distribute=(players,total,field,weights)=>{
  if(!players.length)return;
- const ws=players.map(weights),sum=ws.reduce((a,b)=>a+b,0)||1;
+ // Rounding each player's proportional share independently could over-allocate
+ // small totals (especially touchdowns), giving the last player negative stats.
+ const available=Math.max(0,Math.round(Number(total)||0));
+ const ws=players.map(p=>Math.max(0,Number(weights(p))||0));
+ const sum=ws.reduce((a,b)=>a+b,0)||1;
  let allocated=0;
- players.forEach((p,i)=>{let n=i===players.length-1?total-allocated:Math.max(0,Math.round(total*ws[i]/sum));allocated+=n;p.stats[field]=(p.stats[field]||0)+n});
+ players.forEach((p,i)=>{
+   const remaining=available-allocated;
+   const n=i===players.length-1?remaining:
+     Math.min(remaining,Math.max(0,Math.round(available*ws[i]/sum)));
+   allocated+=n;p.stats[field]=(p.stats[field]||0)+n;
+ });
 };
 function gameContext(g){
  const weather=['Clear','Clear','Clear','Rain','Wind','Snow','Extreme Cold'][rand(0,6)];
@@ -105,6 +114,9 @@ function game(g){
   distribute(receivers,passYards,'receivingYards',p=>Math.max(1,p.rating-48)*(p.pos==='WR'?1.2:.8)*(1+(window.GMPlayerPersonality?.performanceModifier(p,'receive')||0)));
   distribute(receivers,Math.round(passYards/12),'receptions',p=>Math.max(1,p.rating-48));
   distribute(rbs,Math.max(0,tds-Math.round(tds*passShare)),'rushTD',p=>Math.max(1,p.rating-48));
+  // Match receiving touchdowns to the QB's passing touchdowns. Previously receivers
+  // accumulated yards and catches but never received touchdowns in the season stats.
+  distribute(receivers,q?Math.max(0,Math.round(tds*passShare)):0,'recTD',p=>Math.max(1,p.rating-48));
   for(const p of [...rbs,...receivers]){p.stats.yards=(p.stats.rushYards||0)+(p.stats.receivingYards||0);p.stats.td=(p.stats.rushTD||0)+(p.stats.recTD||0)}
   const thirdDownAttempts=rand(9,16),thirdDownConversions=clamp(Math.round(thirdDownAttempts*(.32+(scoreTeam(team).off-65)*.003+noise(.08))),0,thirdDownAttempts);
   teamLines.push({team,points:forPts,totalYards,passYards,rushYards,passShare:+passShare.toFixed(2),thirdDownAttempts,thirdDownConversions,turnovers:q?Math.max(0,(q.stats.interceptions||0)-previousInts):0});

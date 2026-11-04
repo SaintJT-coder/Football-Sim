@@ -25,6 +25,18 @@ const originalCareer=JSON.stringify(cpu.careerStats),
  originalTrait=JSON.stringify(cpu.personalityProfile.traits);
 const state={team:0,year:2027,week:8,players:[own,cpu],
  news:Array.from({length:600},(_,i)=>'News story '+i)};
+state.simPresentation={
+ gameReports:[
+  ...Array.from({length:35},(_,i)=>({id:'own-'+i,year:i<10?2025:2027,a:0,b:1,
+    leaders:[{name:'AI Star',rating:84,stats:{receivingYards:999,recTD:12}}],
+    originalReport:{quarters:[7,7,7,7],teams:['Team 0','Team 1']}})),
+  ...Array.from({length:15},(_,i)=>({id:'other-'+i,year:2027,a:2,b:3,
+    leaders:[{name:'Other',rating:82,stats:{passYards:999}}],
+    originalReport:{unused:true}}))
+ ],
+ pressConferences:Array.from({length:90},(_,i)=>({id:i,headline:'Press '+i})),
+ rivalries:{'0-1':{games:12,results:Array.from({length:12},(_,i)=>({year:2026,week:i+1}))}}
+};
 const before=Buffer.byteLength(JSON.stringify(state),'utf8');
 const result=T.compact(state);
 assert.ok(result.entriesPruned>0);
@@ -41,6 +53,13 @@ assert.equal(JSON.stringify(cpu.personalityProfile.traits),originalTrait);
 assert.equal(cpu.personalityProfile.snaps.season,340);
 assert.equal(cpu.personalityProfile.snaps.total,10920);
 assert.equal(state.news.length,T.CONFIG.newsEntries);
+assert.equal(state.simPresentation.gameReports.filter(x=>x.a===0).length,20);
+assert.equal(state.simPresentation.gameReports.filter(x=>x.a===2).length,15);
+assert.equal(state.simPresentation.pressConferences.length,30);
+assert.equal(state.simPresentation.rivalries['0-1'].results.length,2);
+assert.ok(state.simPresentation.gameReports.every(r=>r.leaders.every(p=>!('stats' in p))));
+assert.ok(state.simPresentation.gameReports.filter(r=>r.year===2025).every(r=>!('originalReport' in r)));
+
 const after=Buffer.byteLength(JSON.stringify(state),'utf8');
 assert.ok(after<before);
 assert.equal(T.compact(state).entriesPruned,0,'Compaction must be idempotent');
