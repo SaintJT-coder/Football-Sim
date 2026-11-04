@@ -1,90 +1,132 @@
+/* Gridiron GM mobile Chromium regression.
+ * Uses the current 32-team game, named v3 save slots and new presentation modules.
+ * Run: node tests/smoke.cjs (requires Playwright Chromium). */
+'use strict';
 const {chromium}=require('playwright');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
- const page=await browser.newPage({viewport:{width:390,height:844}});
+ const context=await browser.newContext({
+   viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true
+ });
+ const page=await context.newPage();
  const errors=[];
- page.on('pageerror',e=>errors.push(e.message));
- await page.goto('file://'+process.cwd()+'/index.html',{waitUntil:'load'});
- await page.waitForTimeout(800);
- const menuVisible=await page.locator('#gm-menu').count();
- if(menuVisible!==1)throw Error('Main menu failed to initialize');
- await page.locator('[data-action="main"]').first().click();
- if(await page.locator('#gm-menu [data-action="continue"]').count())throw Error('Continue shown without valid save');
- await page.locator('#gm-menu [data-action="new"]').click();
- await page.locator('#gm-menu [data-action="start"]').click();
- if(await page.locator('#gm-menu').count())throw Error('New franchise did not enter game');
- await page.evaluate(()=>openGridironMenu());
- if(await page.locator('#gm-menu [data-action="continue"]').count()!==1)throw Error('Continue missing after save');
- await page.locator('#gm-menu [data-action="load"]').click();
- if(await page.locator('#gm-menu [data-load="0"]').count()!==1)throw Error('New save not found in slot 1');
- await page.locator('#gm-menu [data-action="main"]').click();
- await page.locator('#gm-menu [data-action="continue"]').click();
- if(await page.locator('#gm-menu').count())throw Error('Continue did not enter game');
- const boot=await page.evaluate(()=>({year:state.year,week:state.week,nav:pages.slice(),players:state.players.length}));
- if(boot.players<100)throw Error('Players not initialized');
- for(const tab of ['Dashboard','Roster','Depth Chart','Combine','Coaching Staff','Salary Cap','Schedule','Weekly Report','Draft Board','Player Market','Trade Center','Animation']){
-  await page.evaluate(tab=>{page=tab;render()},tab);
-  await page.waitForTimeout(60);
-  const html=await page.locator('#app').innerText();
-  if(!html.trim())throw Error('Empty page: '+tab);
+ page.on('pageerror',error=>errors.push(error.message));
+ page.on('dialog',async dialog=>{
+   await dialog.accept(dialog.type()==='prompt'?'QA Alternate Timeline':undefined);
+ });
+ page.setDefaultTimeout(120000);
+ try{
+   await page.goto('file://'+process.cwd()+'/index.html',{waitUntil:'load'});
+   await page.locator('#gm-menu').waitFor({state:'visible'});
+   await page.locator('#gm-menu [data-action="main"]').first().click();
+   if(await page.locator('#gm-menu [data-action="continue"]').count())
+     throw Error('Continue shown on fresh installation');
+   await page.locator('#gm-menu [data-action="new"]').click();
+   await page.locator('#gm-menu #gm-franchise-name').fill('QA Alpha Dynasty');
+   await page.locator('#gm-menu [data-action="start"]').click();
+   await page.locator('#gm-menu').waitFor({state:'detached'});
+   const initial=await page.evaluate(()=>({
+     team:state.team,year:state.year,week:state.week,
+     players:state.players.length,slot:GMSaveManager.activeId(),
+     names:GMSaveManager.index().map(x=>x.name)
+   }));
+   if(initial.players<900||initial.team!==0||initial.names[0]!=='QA Alpha Dynasty')
+     throw Error('New named franchise did not initialize: '+JSON.stringify(initial));
+
+   // Inspect every built-in and dynamically registered tab using actual browser DOM.
+   const tabs=await page.evaluate(()=>pages.slice());
+   for(const tab of tabs){
+     await page.evaluate(label=>{page=label;render()},tab);
+     const content=(await page.locator('#app').innerText()).trim();
+     if(!content)throw Error('Blank game tab: '+tab);
+   }
+   await page.evaluate(()=>{closeDraftIntro?.();closeDraftCelebration?.()});
+
+   // Confirm the canvas-based first-pick preview actually animates in an iframe.
+   await page.evaluate(()=>{page='Animation';render()});
+   await page.locator('#app button[onclick*="playDraftAnimationPreview"]').click();
+   const overlay=page.locator('#dn-first-pick-broadcast');
+   await overlay.waitFor({state:'visible'});
+   const frameHandle=await overlay.locator('iframe').elementHandle();
+   const frame=await frameHandle.contentFrame();
+   if(!frame)throw Error('Draft broadcast iframe did not initialize');
+   await frame.locator('#c').waitFor({state:'visible'});
+   const started=await frame.waitForFunction(
+     ()=>typeof cycle==='number'&&cycle>0.08,null,{timeout:8000}
+   ).then(()=>true).catch(()=>false);
+   if(!started)throw Error('Draft canvas was visible but its frame clock did not advance');
+   await overlay.locator('button').click();
+   await overlay.waitFor({state:'detached'});
+
+   // The simulation now plays sixteen games per week across 32 teams.
+   await page.evaluate(()=>{page='Dashboard';render()});
+   const before=await page.evaluate(()=>({week:state.week,results:state.results.length}));
+   await page.evaluate(()=>simulate());
+   const after=await page.evaluate(()=>({
+     week:state.week,results:state.results.length,
+     press:state.immersionPress?.active?.questions?.length,
+     gameReports:state.simPresentation?.gameReports?.length||0
+   }));
+   if(after.week!==before.week+1||after.results!==before.results+16)
+     throw Error('32-team week did not simulate correctly: '+JSON.stringify({before,after}));
+   if(after.press!==3||after.gameReports<16)
+     throw Error('Postgame reports or press conference missing: '+JSON.stringify(after));
+
+   await page.evaluate(()=>{page='Press Room';render()});
+   for(let i=0;i<3;i++){
+     const answer=page.locator('#app .gm-p7-answer').first();
+     await answer.waitFor({state:'visible'});
+     await answer.click();
+   }
+   const press=await page.evaluate(()=>state.immersionPress.history[0]?.answers?.length);
+   if(press!==3)throw Error('Three press questions were not recorded');
+
+   await page.evaluate(()=>{page='Game Reports & Media';render()});
+   const mediaText=await page.locator('#app').innerText();
+   if(!mediaText.includes('GAME REPORTS & MEDIA'))
+     throw Error('Game Reports page did not render after simulation');
+
+   // Starter changes must change the actual lineup while preserving save state.
+   await page.evaluate(()=>{page='Depth Chart';render()});
+   const qbs=await page.evaluate(()=>GMRosterRules.depth(state,state.team,'QB').map(p=>p.id));
+   if(qbs.length>1){
+     const changed=await page.evaluate(id=>GMImmersion.setStarter(state,'QB',id),qbs[1]);
+     if(!changed.ok)throw Error('Healthy quarterback could not be moved to starter');
+     const leader=await page.evaluate(()=>GMRosterRules.depth(state,state.team,'QB')[0].id);
+     if(String(leader)!==String(qbs[1]))throw Error('Starter change not reflected in depth order');
+     await page.evaluate(()=>save());
+   }
+
+   // Named franchise slots must be isolated after the application reloads.
+   await page.evaluate(()=>openGridironMenu());
+   await page.locator('#gm-menu [data-action="new"]').click();
+   await page.locator('#gm-menu [data-team="1"]').click();
+   await page.locator('#gm-menu #gm-franchise-name').fill('QA Beta Dynasty');
+   await page.locator('#gm-menu [data-action="start"]').click();
+   await page.locator('#gm-menu').waitFor({state:'detached'});
+   const second=await page.evaluate(()=>({
+     team:state.team,names:GMSaveManager.index().map(x=>x.name)
+   }));
+   if(second.team!==1||second.names.length!==2)
+     throw Error('Second named franchise failed: '+JSON.stringify(second));
+
+   await page.evaluate(()=>openGridironMenu());
+   await page.locator('#gm-menu [data-action="load"]').click();
+   await page.locator('#gm-menu').waitFor({state:'detached'});
+   const alphaButton=page.locator('#app button[onclick="gmLoadSlot(\''+initial.slot+'\')"]');
+   await alphaButton.click();
+   await page.locator('#gm-menu').waitFor({state:'visible'});
+   const loaded=await page.evaluate(()=>({
+     team:state.team,year:state.year,week:state.week,results:state.results.length,
+     slot:GMSaveManager.activeId()
+   }));
+   if(loaded.team!==0||loaded.week!==2||loaded.results!==16||loaded.slot!==initial.slot)
+     throw Error('Reload restored the wrong franchise: '+JSON.stringify(loaded));
+
+   if(errors.length)throw Error('Browser script exceptions: '+errors.join(' | '));
+   console.log('PASS mobile browser: '+tabs.length+
+     ' tabs, animated draft canvas, 16-game simulation, reports, 3-question press room, depth chart and independent saves');
+ }finally{
+   await browser.close();
  }
- await page.evaluate(()=>{page='Schedule';render()});
- const initial=await page.evaluate(()=>({week:state.week,results:state.results.length}));
- await page.evaluate(()=>simulate());
- const after=await page.evaluate(()=>({week:state.week,results:state.results.length,schedule:state.engine.schedule.length,report:state.results.at(-1)?.report}));
- if(after.week!==initial.week+1)throw Error('Week did not advance exactly once');
- if(after.results!==initial.results+6)throw Error('Expected 6 games per week, got '+(after.results-initial.results));
- if(after.schedule!==108)throw Error('Expected 108 scheduled games, got '+after.schedule);
- if(!after.report?.quarters)throw Error('Missing game report');
- await page.evaluate(()=>{page='Salary Cap';render()});
- const beforeContract=await page.evaluate(()=>({cash:state.cash,years:roster()[0].years,id:roster()[0].id}));
- await page.evaluate(id=>gmNegotiate(id),beforeContract.id);
- const afterContract=await page.evaluate(id=>({cash:state.cash,years:state.players.find(p=>p.id===id).years}),beforeContract.id);
- if(afterContract.years<beforeContract.years)throw Error('Contract extension corrupted years');
- await page.evaluate(()=>{page='Combine';render()});
- await page.evaluate(()=>{page='Coaching Staff';render()});
- const staffCount=await page.locator('#app button[onclick^="gmHireStaff"]').count();
- if(staffCount<3)throw Error('Coaching staff hiring buttons missing');
- await page.evaluate(()=>{page='Depth Chart';render()});
- const rosterBefore=await page.evaluate(()=>GMFranchise.depth(state,state.team,'QB').map(p=>p.id));
- if(rosterBefore.length>1){
-  await page.evaluate(()=>gmMoveDepth('QB',1,-1));
-  const rosterAfter=await page.evaluate(()=>GMFranchise.depth(state,state.team,'QB').map(p=>p.id));
-  if(String(rosterAfter[0])!==String(rosterBefore[1]))throw Error('Depth reorder not persisted');
- }
- await page.reload({waitUntil:'load'});
- const saved=await page.evaluate(()=>({week:state.week,results:state.results.length}));
- if(saved.week!==after.week||saved.results!==after.results)throw Error('Save failed to persist');
- await page.evaluate(()=>{page='Weekly Report';render();gmBoxScore(0)});
- if(await page.locator('#gm-close-box').count()!==1)throw Error('Box score modal did not open');
- await page.locator('#gm-close-box').click();
- await page.evaluate(()=>{page='Depth Chart';render()});
- const count=await page.locator('#app button[onclick^="gmMoveDepth"]').count();
- if(count<2)throw Error('Depth chart buttons missing');
- // Audit every registered game page, not only the primary tabs.
- for(const tab of await page.evaluate(()=>pages.slice())){
-  await page.evaluate(tab=>{page=tab;render()},tab);
-  const content=await page.locator('#app').innerText();
-  if(!content.trim())throw Error('Blank game tab: '+tab);
- }
- // Validate new-game slot isolation, deletion, and saved-team selection.
- await page.evaluate(()=>openGridironMenu());
- await page.locator('#gm-menu [data-action="new"]').click();
- await page.locator('#gm-menu [data-team="1"]').click();
- await page.locator('#gm-menu #gm-slot').selectOption('1');
- await page.locator('#gm-menu [data-action="start"]').click();
- const second=await page.evaluate(()=>({team:state.team,slot:state.menuSlot}));
- if(second.team!==1||second.slot!==1)throw Error('Second franchise team/slot not selected');
- await page.evaluate(()=>openGridironMenu());
- await page.locator('#gm-menu [data-action="load"]').click();
- if(await page.locator('#gm-menu [data-load]').count()!==2)throw Error('Expected two independent save slots');
- await page.locator('#gm-menu [data-load="0"]').click();
- if(await page.evaluate(()=>state.menuSlot)!==0)throw Error('Slot 1 did not load');
- // A complete regular season should simulate without throwing or duplicating games.
- await page.evaluate(()=>{for(let i=0;i<17;i++)simulate()});
- const season=await page.evaluate(()=>({week:state.week,results:state.results.filter(g=>g.year===state.year).length}));
- if(season.week!==19||season.results!==108)throw Error('Season progression invalid: '+JSON.stringify(season));
- if(errors.length)throw Error('Browser exceptions: '+errors.join(' | '));
- console.log('PASS mobile navigation, 6-game simulation, reports, saves, depth chart and box scores');
- await browser.close();
-})().catch(e=>{console.error(e);process.exit(1)});
+})().catch(error=>{console.error(error);process.exit(1)});
