@@ -19,7 +19,7 @@ const CONFIG={
  trade:{margin:1.08,positionNeedMax:1.18,positionNeedMin:.92,roundPremium:1.02,maxPicksPerSide:6},
  fifthYear:{length:4,optionYear:5,deadlineSeasonOffset:2,
    salaryMultiplier:1.4,salaryFloor:5,exerciseMinRating:77,autoDecisionWeek:18},
- ui:{display:64,showAfterDraft:20}
+ ui:{display:48,showAfterDraft:20,tradeDisplay:20}
 };
 const POS=['QB','RB','WR','TE','OL','DL','LB','CB','S','K'];
 const FIRST=['Mason','Jalen','Eli','Tyrese','Andre','Malik','Carter','Devin','Noah','Darius','Cole','Bryce','Landon','Kendrick','Jordan','Micah','Dante','Trey','Jamar','Jaylen','Ashton','Travis','Roman','Avery'];
@@ -304,16 +304,66 @@ function seasonEnd(s){
  }
  return changes;
 }
+
+function draftView(s){
+ const count=root.TEAMS?.length||32;
+ const v=s.draftRealismView??={position:'ALL',page:0,partner:(s.team+1)%count,give:[],receive:[]};
+ v.give??=[];v.receive??=[];
+ if(!Number.isInteger(v.partner)||v.partner===s.team||v.partner<0||v.partner>=count){v.partner=(s.team+1)%count;v.receive=[]}
+ return v;
+}
+function draftTradePanel(s){
+ const v=draftView(s),all=s.frontOffice?.picks||[];
+ const mine=all.filter(p=>!p.used&&p.owner===s.team).sort((a,b)=>a.round-b.round||a.slot-b.slot);
+ const theirs=all.filter(p=>!p.used&&p.owner===v.partner).sort((a,b)=>a.round-b.round||a.slot-b.slot);
+ v.give=v.give.filter(id=>mine.some(p=>String(p.id)===String(id)));
+ v.receive=v.receive.filter(id=>theirs.some(p=>String(p.id)===String(id)));
+ const q=v.give.length&&v.receive.length?quoteTrade(s,v.give,v.receive,v.partner):null;
+ const other=root.TEAMS?.[v.partner]?.[1]||'AI Club';
+ const choices=(pool,side,selected)=>pool.slice(0,CONFIG.ui.tradeDisplay).map(p=>{
+   const active=selected.some(id=>String(id)===String(p.id));
+   return '<div class="row" style="gap:8px;padding:8px 0"><span>Round '+p.round+
+   ' · Pick '+p.slot+' · '+pickValue(p.round,p.slot,s)+' pts</span>'+
+   '<button onclick="gmDraftTradeToggle('+JSON.stringify(side)+','+JSON.stringify(p.id)+')">'+
+   (active?'REMOVE':'ADD')+'</button></div>';
+ }).join('');
+ const partnerOptions=(root.TEAMS||[]).map((team,i)=>i===s.team?'':(
+   '<option value="'+i+'"'+(v.partner===i?' selected':'')+'>'+esc(team[1])+'</option>')).join('');
+ return '<div class="card"><h3>LIVE PICK SWAP BUILDER</h3>'+
+ '<p class="sub">Trade up to '+CONFIG.trade.maxPicksPerSide+' unused picks on either side.</p>'+
+ '<label>Trade partner <select onchange="gmDraftTradePartner(this.value)">'+partnerOptions+'</select></label>'+
+ '<p class="muted">'+esc(other)+' priority: '+esc(positionalNeed(s,v.partner).pos)+'</p>'+
+ '<div class="grid two"><div><h3>YOUR PICKS ('+v.give.length+')</h3>'+
+ (choices(mine,'give',v.give)||'<p>No unused picks</p>')+'</div>'+
+ '<div><h3>'+esc(other)+' PICKS ('+v.receive.length+')</h3>'+
+ (choices(theirs,'receive',v.receive)||'<p>No unused picks</p>')+'</div></div>'+
+ (q?.ok?'<p><b>Offer '+q.offered+' points · Required '+q.required+' points</b> · '+
+   (q.accepted?'Acceptable':'Add picks')+'</p>':
+  '<p>Select picks from both teams to preview the AI valuation.</p>')+
+ '<button class="primary" onclick="gmDraftTradeExecute()"'+(!q?.accepted?' disabled':'')+
+ '>COMPLETE TRADE</button></div>';
+}
 function page(s){
  const f=s.frontOffice||{},pool=(f.prospects||[]).filter(p=>!p.drafted),
-   r=resources(s),options=s.players.filter(p=>p.team===s.team&&p.draftFifthYear&&!p.draftFifthYear.decided);
+   r=resources(s),v=draftView(s),options=s.players.filter(p=>p.team===s.team&&p.draftFifthYear&&!p.draftFifthYear.decided);
+ const positions=['ALL',...POS],filtered=pool.filter(p=>v.position==='ALL'||p.pos===v.position)
+   .sort((a,b)=>estimated(b,s)-estimated(a,s));
+ const pages=Math.max(1,Math.ceil(filtered.length/CONFIG.ui.display));
+ v.page=clamp(v.page,0,pages-1);
  const current=f.picks?.filter(p=>!p.used).sort((a,b)=>a.round-b.round||a.slot-b.slot)[0];
  return '<div class="eyebrow">DRAFT COMBINE & SCOUTING</div><h1 class="heading">THE EVALUATION LAB</h1>'+
  '<p class="sub">Seven rounds · '+(f.picks?.length||0)+' picks · '+(f.prospects?.length||0)+' prospects. Hidden true ratings are revealed only after selection.</p>'+
  '<div class="grid three"><div class="card"><h3>PRO DAY REVIEWS</h3><h2>'+r.proDays+'</h2></div>'+
  '<div class="card"><h3>COMBINE REVIEWS</h3><h2>'+r.combineReview+'</h2></div>'+ '<div class="card"><h3>PRIVATE WORKOUTS</h3><h2>'+r.privateWorkouts+'</h2></div>'+
  '<div class="card"><h3>ON THE CLOCK</h3><h2>'+(current?'R'+current.round+' / '+current.slot:'COMPLETE')+'</h2></div></div>'+
- '<h2>PROSPECT EVALUATIONS</h2><div class="grid two">'+pool.slice().sort((a,b)=>estimated(b,s)-estimated(a,s)).slice(0,CONFIG.ui.display).map(p=>{
+ '<h2>PROSPECT EVALUATIONS</h2><p class="muted">'+filtered.length+
+ ' available prospects · Page '+(v.page+1)+' / '+pages+'</p>'+
+ '<div class="filters">'+positions.map(pos=>'<button class="'+(v.position===pos?'selected':'')+
+ '" onclick="gmDraftRealPosition('+JSON.stringify(pos)+')">'+pos+'</button>').join('')+'</div>'+
+ '<div class="filters"><button onclick="gmDraftRealPage(-1)"'+(v.page===0?' disabled':'')+
+ '>PREVIOUS</button> <button onclick="gmDraftRealPage(1)"'+(v.page>=pages-1?' disabled':'')+
+ '>NEXT</button></div>'+
+ '<div class="grid two">'+filtered.slice(v.page*CONFIG.ui.display,(v.page+1)*CONFIG.ui.display).map(p=>{
    const g=publicGrade(p,s),stats=g.combine;
    return '<div class="card"><h3>'+esc(p.name)+' · '+esc(p.pos)+'</h3>'+
    '<p>Public grade <b>'+g.overall+' ± '+g.margin+'</b> · '+g.confidence+'% scout confidence</p>'+
@@ -335,10 +385,35 @@ function page(s){
        '. If no choice is made before that season ends, a rating-based automatic decision applies.</p>')+
    '</div>';}).join('')||
  '<div class="card">No outstanding fifth-year option decisions.</div>')+
- '<h2>DRAFT PICK TRADES</h2>'+
- '<div class="card"><p class="sub">Trade unused picks with AI clubs. Values follow a declining seven-round chart with team-need premiums.</p>'+
- '<button onclick="gmDraftTradePrompt()">PROPOSE PICK SWAP</button></div>';
+ '<h2>DRAFT PICK TRADES</h2>'+draftTradePanel(s);
 }
+root.gmDraftRealPosition=pos=>{
+ if(!['ALL',...POS].includes(pos))return;
+ const v=draftView(state);v.position=pos;v.page=0;render();
+};
+root.gmDraftRealPage=delta=>{
+ const v=draftView(state);v.page=Math.max(0,v.page+(delta>0?1:-1));render();
+};
+root.gmDraftTradePartner=value=>{
+ const v=draftView(state),team=Number(value);
+ if(!Number.isInteger(team)||team<0||team>=(root.TEAMS?.length||32)||team===state.team)return;
+ v.partner=team;v.receive=[];render();
+};
+root.gmDraftTradeToggle=(side,id)=>{
+ if(!['give','receive'].includes(side))return;
+ const v=draftView(state),owner=side==='give'?state.team:v.partner;
+ const pick=state.frontOffice?.picks?.find(p=>String(p.id)===String(id));
+ if(!pick||pick.used||pick.owner!==owner)return;
+ const list=v[side],index=list.findIndex(x=>String(x)===String(id));
+ if(index>=0)list.splice(index,1);
+ else if(list.length<CONFIG.trade.maxPicksPerSide)list.push(id);
+ render();
+};
+root.gmDraftTradeExecute=()=>{
+ const v=draftView(state),result=tradePicks(state,v.give,v.receive,v.partner);
+ if(!result.ok){alert(result.error);return}
+ v.give=[];v.receive=[];save();render();
+};
 root.GMDraftRealism={CONFIG,create,enrich,generate,prospectsNeeded,accuracy,staffQuality,
  estimated,scout,combine,proDay,workout,resources,publicGrade,draftValue,
  pickValue,positionalNeed,quoteTrade,tradePicks,rookieContract,decideFifthYear,seasonEnd,page};
