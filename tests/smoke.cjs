@@ -115,10 +115,20 @@ const {chromium}=require('playwright');
    await page.locator('#gm-menu').waitFor({state:'detached'});
    const alphaButton=page.locator('#app button[onclick="gmLoadSlot(\''+initial.slot+'\')"]');
    await alphaButton.click();
-   // Loading a slot navigates/reloads the app; it does not guarantee the main menu is open.
-   // Wait for the selected save to be restored rather than a particular overlay state.
-   await page.waitForFunction(id=>typeof state!=='undefined'&&
-     state.team===0&&window.GMSaveManager?.activeId()===id,initial.slot,{timeout:30000});
+   // Inspect the restored state after the slot load/reload and surface actionable
+   // diagnostics instead of hanging on a particular menu overlay.
+   await page.waitForLoadState('load');
+   await page.waitForTimeout(400);
+   const restoredDebug=await page.evaluate(()=>({
+     team:typeof state==='undefined'?null:state.team,
+     year:typeof state==='undefined'?null:state.year,
+     week:typeof state==='undefined'?null:state.week,
+     slot:window.GMSaveManager?.activeId()||null,
+     storedSlot:localStorage.getItem('gridiron-gm-current-slot-v3'),
+     menuVisible:!!document.getElementById('gm-menu'),
+     savedNames:window.GMSaveManager?.index?.().map(x=>x.name)||[]
+   }));
+   console.log('Reloaded slot diagnostics:',JSON.stringify(restoredDebug));
    const loaded=await page.evaluate(()=>({
      team:state.team,year:state.year,week:state.week,results:state.results.length,
      slot:GMSaveManager.activeId()
