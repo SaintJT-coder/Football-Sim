@@ -3,6 +3,17 @@
 const KEY='gridiron-gm-save',INDEX='gridiron-gm-save-index-v3',PREFIX='gridiron-gm-slot-v3:',CURRENT='gridiron-gm-current-slot-v3',LEGACY='gridiron-gm-slots-v2',LEGACY_DONE='gridiron-gm-v2-imported-v3';
 const read=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}};
 const clone=v=>JSON.parse(JSON.stringify(v));
+// The named slot is canonical. A compatibility mirror is best-effort because
+// a second full JSON copy can exceed Safari/Chromium localStorage quota.
+function writeMirror(value){
+ try{localStorage.setItem(KEY,JSON.stringify(value));return true}
+ catch(error){
+   if(error?.name!=='QuotaExceededError'&&!/quota/i.test(String(error?.message)))throw error;
+   try{localStorage.removeItem(KEY)}catch{}
+   console.warn('Gridiron GM: compatibility mirror skipped; canonical named save remains available');
+   return false;
+ }
+}
 const valid=s=>!!(s&&Number.isInteger(s.year)&&s.year>=1900&&s.year<=2500&&Number.isInteger(s.week)&&s.week>=1&&s.week<=30&&Array.isArray(s.players)&&s.players.length>0&&s.players.length<=10000&&Number.isInteger(s.team)&&s.team>=0&&s.team<(w.TEAMS?.length||32));
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const index=()=>Array.isArray(read(INDEX))?read(INDEX):[];
@@ -18,7 +29,7 @@ const meta=(s,name,branchOf)=>({name:String(name||'Franchise').slice(0,80),year:
 function write(s,name,slotId,branchOf){if(!valid(s))throw Error('Invalid franchise state');const key=slotId||id(),entries=index(),previous=entries.find(x=>x.id===key);const info={id:key,...meta(s,name||previous?.name,branchOf===undefined?previous?.branchOf:branchOf)};localStorage.setItem(PREFIX+key,JSON.stringify(s));const updated=[info,...entries.filter(x=>x.id!==key)];localStorage.setItem(INDEX,JSON.stringify(updated));return info}
 function snapshot(s){const key=activeId();if(!key)return;const info=index().find(x=>x.id===key);if(!info)return;write(s,info.name,key)}
 function create(s,name){const info=write(s,name);localStorage.setItem(CURRENT,info.id);return info}
-function activate(slotId){const entry=index().find(x=>x.id===slotId),data=read(PREFIX+slotId);if(!entry||!valid(data))throw Error('Save slot is missing or invalid');localStorage.setItem(CURRENT,slotId);localStorage.setItem(KEY,JSON.stringify(data));return clone(data)}
+function activate(slotId){const entry=index().find(x=>x.id===slotId),data=read(PREFIX+slotId);if(!entry||!valid(data))throw Error('Save slot is missing or invalid');localStorage.setItem(CURRENT,slotId);writeMirror(data);return clone(data)}
 function branch(s,name){
  // Store the exact fork point in the parent before changing the active timeline.
  // A second save of the branch must never alter this parent snapshot.
@@ -26,7 +37,7 @@ function branch(s,name){
  if(parentEntry)write(clone(s),parentEntry.name,parent,parentEntry.branchOf);
  const info=write(clone(s),name||'What If: '+(parentEntry?.name||'Franchise'),undefined,parent||null);
  localStorage.setItem(CURRENT,info.id);
- localStorage.setItem(KEY,JSON.stringify(s));
+ writeMirror(s);
  return info;
 }
 function remove(slotId){
@@ -55,13 +66,13 @@ function bootstrap(s){
  if(existing){
    localStorage.setItem(CURRENT,existing.id);
    const data=read(PREFIX+existing.id);
-   localStorage.setItem(KEY,JSON.stringify(data));
+   writeMirror(data);
    return;
  }
  if(!valid(s))return;
  const info=write(s,'Original Franchise');
  localStorage.setItem(CURRENT,info.id);
- localStorage.setItem(KEY,JSON.stringify(s));
+ writeMirror(s);
 }
 function legacyPending(){
  const slots=read(LEGACY),done=read(LEGACY_DONE);
@@ -226,7 +237,7 @@ function page(s){
    (branches.length?'<div class="grid two">'+branches.map(card).join('')+'</div>':
      '<div class="card">No alternate timelines yet. Create a What If branch to explore a different outcome without replacing your main save.</div>');
 }
-const api={index,activeId,restore,bootstrap,legacyPending,importLegacySlots,snapshot,create,activate,branch,remove,rename,exportSave,importSave,compare,page,labPage};
+const api={index,activeId,restore,writeMirror,bootstrap,legacyPending,importLegacySlots,snapshot,create,activate,branch,remove,rename,exportSave,importSave,compare,page,labPage};
 w.Gridiron?.register('saves',api);w.GMSaveManager=api;
 w.gmImportLegacy=()=>{
  const pending=legacyPending();
