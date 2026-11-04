@@ -19,7 +19,16 @@ function write(s,name,slotId,branchOf){if(!valid(s))throw Error('Invalid franchi
 function snapshot(s){const key=activeId();if(!key)return;const info=index().find(x=>x.id===key);if(!info)return;write(s,info.name,key)}
 function create(s,name){const info=write(s,name);localStorage.setItem(CURRENT,info.id);return info}
 function activate(slotId){const entry=index().find(x=>x.id===slotId),data=read(PREFIX+slotId);if(!entry||!valid(data))throw Error('Save slot is missing or invalid');localStorage.setItem(CURRENT,slotId);localStorage.setItem(KEY,JSON.stringify(data));return clone(data)}
-function branch(s,name){const parent=activeId();const info=write(clone(s),name||'What If: '+(index().find(x=>x.id===parent)?.name||'Franchise'),undefined,parent);localStorage.setItem(CURRENT,info.id);localStorage.setItem(KEY,JSON.stringify(s));return info}
+function branch(s,name){
+ // Store the exact fork point in the parent before changing the active timeline.
+ // A second save of the branch must never alter this parent snapshot.
+ const parent=activeId(),parentEntry=index().find(x=>x.id===parent);
+ if(parentEntry)write(clone(s),parentEntry.name,parent,parentEntry.branchOf);
+ const info=write(clone(s),name||'What If: '+(parentEntry?.name||'Franchise'),undefined,parent||null);
+ localStorage.setItem(CURRENT,info.id);
+ localStorage.setItem(KEY,JSON.stringify(s));
+ return info;
+}
 function remove(slotId){
  const entries=index(),target=entries.find(x=>x.id===slotId);
  if(!target)return false;
@@ -75,20 +84,91 @@ function importLegacySlots(){
  return imported;
 }
 function compare(slotId){
- const item=index().find(x=>x.id===slotId);if(!item?.branchOf)return null;
- const parent=index().find(x=>x.id===item.branchOf);
- const childData=read(PREFIX+slotId),parentData=read(PREFIX+item.branchOf);
+ const item=index().find(x=>x.id===slotId);
+ if(!item?.branchOf)return null;
+ const parent=index().find(x=>x.id===item.branchOf),childData=read(PREFIX+slotId),
+   parentData=read(PREFIX+item.branchOf);
  if(!parent||!valid(childData)||!valid(parentData))return null;
- const wins=(data)=>{
-   const own=data.team,year=data.year;
-   return (data.results||[]).filter(g=>g.year===year&&
-     (g.a===own||g.b===own)&&((g.sa>g.sb?g.a:g.b)===own)).length;
+ const performance=s=>{
+   const recent=(s.results||[]).filter(g=>g.year===s.year&&(g.a===s.team||g.b===s.team));
+   const wins=recent.filter(g=>(g.sa>g.sb?g.a:g.b)===s.team).length;
+   const active=s.players.filter(p=>p.team===s.team);
+   const overall=active.length?Math.round(active.reduce((sum,p)=>sum+(p.rating||0),0)/active.length):0;
+   const injured=active.filter(p=>Number(p.injury||0)>0).length;
+   const titles=(s.history||[]).filter(h=>h.year<=s.year&&h.champ===w.TEAMS?.[s.team]?.[1]).length;
+   const championships=(s.leagueNarratives?.champions||[]).filter(h=>h.team===s.team).length;
+   const security=s.ownerFranchise?.jobSecurity??s.engineExtra?.jobSecurity??null;
+   const press=(s.immersionPress?.history||[]).filter(m=>m.completed).length;
+   return {wins,losses:recent.length-wins,played:recent.length,roster:active.length,
+     overall,injured,cap:Number(s.cap)||0,cash:Number(s.cash)||0,
+     titles:championships||titles,security,press,
+     events:(s.news||[]).length};
  };
- return {parentName:parent.name,yearDelta:childData.year-parentData.year,
-   weekDelta:childData.week-parentData.week,
-   cashDelta:Math.round(((Number(childData.cash)||0)-(Number(parentData.cash)||0))*10)/10,
-   winsDelta:wins(childData)-wins(parentData),
-   note:childData.year===parentData.year?'Same-season comparison':'Different seasons: win difference is not a like-for-like result'};
+ const child=performance(childData),original=performance(parentData);
+ const difference=(a,b)=>Math.round(((Number(a)||0)-(Number(b)||0))*10)/10;
+ const sameSeason=childData.year===parentData.year;
+ return {parentName:parent.name,parentId:parent.id,branchName:item.name,
+   yearDelta:childData.year-parentData.year,weekDelta:childData.week-parentData.week,
+   cashDelta:difference(child.cash,original.cash),
+   winsDelta:difference(child.wins,original.wins),
+   recordDelta:child.played-original.played,
+   titleDelta:child.titles-original.titles,
+   overallDelta:difference(child.overall,original.overall),
+   capDelta:difference(child.cap,original.cap),
+   injuredDelta:child.injured-original.injured,
+   securityDelta:child.security==null||original.security==null?null:difference(child.security,original.security),
+   pressDelta:child.press-original.press,
+   child,original,sameSeason,
+   note:sameSeason?'Same-season win comparisons':'Different seasons: records reflect different schedules and are not directly comparable'};
+}
+function labPage(s){
+ const entries=index(),active=activeId(),
+   branches=entries.filter(e=>e.branchOf),main=entries.filter(e=>!e.branchOf),
+   current=entries.find(e=>e.id===active),delta=current?.branchOf?compare(active):null;
+ const metric=(label,value)=>'<div class="gm-save-stat"><small>'+esc(label)+'</small><strong>'+
+   esc(String(value))+'</strong></div>';
+ const sign=n=>(n==null?'—':(n>0?'+':'')+n);
+ const compareCard=d=>'<div class="gm-save-compare">'+
+   '<div class="gm-save-compare-head"><span>'+esc(d.parentName)+'</span><span>WHAT IF: '+esc(d.branchName)+'</span></div>'+
+   '<div class="gm-save-metrics">'+metric('ORIGINAL RECORD',d.original.wins+'–'+d.original.losses)+
+     metric('WHAT IF RECORD',d.child.wins+'–'+d.child.losses)+
+     metric('CASH CHANGE',sign(d.cashDelta)+'M')+
+     metric('ROSTER RATING',sign(d.overallDelta))+
+     metric('INJURED PLAYERS',sign(d.injuredDelta))+
+     metric('CHAMPIONSHIP CHANGE',sign(d.titleDelta))+
+     metric('CAP CHANGE',sign(d.capDelta)+'M')+
+     metric('JOB SECURITY',sign(d.securityDelta))+'</div>'+
+   '<p class="muted">'+esc(d.note)+'</p></div>';
+ const branchCard=e=>{
+   const d=compare(e.id);
+   return '<article class="gm-save-card '+(e.id===active?' gm-save-active':'')+'">'+
+     '<div class="gm-save-tree">'+(e.id===active?'ACTIVE ALTERNATE':'ALTERNATE UNIVERSE')+'</div>'+
+     '<h3>'+esc(e.name)+'</h3><p>Season '+e.year+' · Week '+e.week+'</p>'+
+     (d?'<p>vs '+esc(d.parentName)+' · Cash '+sign(d.cashDelta)+'M · Titles '+sign(d.titleDelta)+
+       ' · Rating '+sign(d.overallDelta)+'</p>':
+       '<p class="muted">Original timeline unavailable for comparison.</p>')+
+     '<button onclick="gmLoadSlot('+JSON.stringify(e.id).replace(/"/g,'&quot;')+
+       ')"'+(e.id===active?' disabled':'')+'>'+(e.id===active?'CURRENT':'OPEN TIMELINE')+'</button></article>';
+ };
+ return '<section class="gm-p7"><div class="gm-p7-hero"><div class="gm-p7-eyebrow">GRIDIRON MULTIVERSE</div>'+
+   '<h1>WHAT IF LAB</h1><p>Explore different drafts, trades, contracts, starting lineups and playoff futures without rewriting the original franchise.</p></div>'+
+   '<div class="gm-save-hero"><div class="eyebrow">CREATE AN ALTERNATE FUTURE</div>'+
+   '<h2>ONE DECISION. TWO DIFFERENT SEASONS.</h2>'+
+   '<p>A What If timeline starts as an independent copy of the active franchise at this exact point. Each future save changes only its own timeline.</p>'+
+   '<button class="primary" onclick="gmWhatIf()">CREATE WHAT IF BRANCH</button> '+
+   (current?.branchOf?'<button onclick="gmReturnToParent()">RETURN TO PARENT TIMELINE</button>':'')+
+   '</div>'+
+   (delta?'<h2 class="gm-p7-heading">YOUR ACTIVE TIMELINE VS THE ORIGINAL</h2>'+compareCard(delta):
+     '<div class="gm-save-archive-note">'+(current?.branchOf?'Your parent save could not be loaded.':
+     'You are on a main timeline. Create a What If branch to compare futures.')+'</div>')+
+   '<h2 class="gm-p7-heading">YOUR ALTERNATE UNIVERSES · '+branches.length+'</h2>'+
+   '<div class="grid two">'+(branches.map(branchCard).join('')||
+     '<div class="card">No What If branches yet.</div>')+'</div>'+
+   '<h2 class="gm-p7-heading">ORIGINAL TIMELINES · '+main.length+'</h2>'+
+   '<div class="grid two">'+main.map(e=>'<div class="gm-save-card"><h3>'+esc(e.name)+'</h3>'+
+     '<p>Season '+e.year+' · Week '+e.week+'</p>'+
+     '<button onclick="gmLoadSlot('+JSON.stringify(e.id).replace(/"/g,'&quot;')+
+     ')"'+(e.id===active?' disabled':'')+'>'+(e.id===active?'CURRENT':'LOAD ORIGINAL')+'</button></div>').join('')+'</div>';
 }
 function page(s){
  // Do not create a phantom franchise just because an unsaved visitor opens Load Game.
@@ -107,6 +187,8 @@ function page(s){
    const comparison=delta?'<div class="gm-save-lineage">PARENT: '+
      esc(delta.parentName)+' · Cash '+(delta.cashDelta>=0?'+':'')+delta.cashDelta+
      'M · Wins '+(delta.winsDelta>=0?'+':'')+delta.winsDelta+
+     ' · Titles '+(delta.titleDelta>=0?'+':'')+delta.titleDelta+
+     ' · OVR '+(delta.overallDelta>=0?'+':'')+delta.overallDelta+
      ' · Year '+(delta.yearDelta>=0?'+':'')+delta.yearDelta+
      '<div class="muted small">'+esc(delta.note)+'</div></div>':
      (e.branchOf?'<div class="gm-save-lineage">Parent branch not found or deleted.</div>':'');
@@ -144,7 +226,7 @@ function page(s){
    (branches.length?'<div class="grid two">'+branches.map(card).join('')+'</div>':
      '<div class="card">No alternate timelines yet. Create a What If branch to explore a different outcome without replacing your main save.</div>');
 }
-const api={index,activeId,restore,bootstrap,legacyPending,importLegacySlots,snapshot,create,activate,branch,remove,rename,exportSave,importSave,compare,page};
+const api={index,activeId,restore,bootstrap,legacyPending,importLegacySlots,snapshot,create,activate,branch,remove,rename,exportSave,importSave,compare,page,labPage};
 w.Gridiron?.register('saves',api);w.GMSaveManager=api;
 w.gmImportLegacy=()=>{
  const pending=legacyPending();
