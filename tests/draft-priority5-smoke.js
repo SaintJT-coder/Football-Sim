@@ -34,6 +34,10 @@ load('frontoffice.js');
 const D=scope.GMDraftRealism,office=state.frontOffice;
 assert.equal(office.picks.length,224);
 assert.equal(office.prospects.length,280);
+const counts=Object.fromEntries(POS.map(pos=>[pos,office.prospects.filter(p=>p.pos===pos).length]));
+assert.ok(Object.values(counts).every(n=>n===28),'Draft class should cover all positions evenly');
+assert.match(scope.GMDraftAdvanced.page(state),/gmScoutAction\("rookie-2026-0"/,
+ 'String prospect IDs must be quoted inside scouting controls');
 assert.equal(office.picks.filter(p=>p.owner===state.team).length,7);
 const p=office.prospects[0];
 const before=D.publicGrade(p,state),start=state.upgrades.scoutPoints;
@@ -54,10 +58,29 @@ assert.equal(day.ok,true);
 assert.equal(D.proDay(p,state).ok,false,'Pro Day repeated');
 const worked=D.workout(p,state);
 assert.equal(worked.ok,true);
+assert.ok(Number.isInteger(worked.variance),'Workout should generate stable grading variance');
+assert.equal(D.workout(p,state).ok,true);
+assert.equal(D.workout(p,state).ok,true);
+assert.equal(D.workout(p,state).ok,false,'Private workout cap is three per prospect');
+const otherProspect=office.prospects[1];
+assert.equal(D.proDay(otherProspect,state).ok,true);
+D.combine(otherProspect,state);
+assert.equal(otherProspect.draftRealism.gradeShift,
+ Math.max(-D.CONFIG.combine.gradeShiftLimit,Math.min(
+   D.CONFIG.combine.gradeShiftLimit,
+   (otherProspect.draftRealism.combineShift||0)+
+   otherProspect.draftRealism.proDay.gradeShift)),
+ 'Combine must not erase an earlier Pro Day grade adjustment');
 assert.equal(D.publicGrade(p,state).confidence>=after.confidence,true);
 
 const pick1=office.picks.find(x=>x.round===1&&x.slot===1);
 const pick2=office.picks.find(x=>x.round===1&&x.slot===2);
+assert.equal(D.pickValue(1,1,state),3000);
+assert.equal(D.pickValue(1,32,state),590);
+const quote=D.quoteTrade(state,[pick1.id],[pick2.id],1);
+assert.ok(quote.ok&&quote.accepted);
+assert.equal(D.quoteTrade(state,[pick1.id],[pick1.id],1).ok,false);
+assert.match(D.page(state),/LIVE PICK SWAP BUILDER/);
 const swap=D.tradePicks(state,[pick1.id],[pick2.id],1);
 assert.equal(swap.ok,true,'Better early pick should satisfy pick trade margin');
 assert.equal(pick1.owner,1);assert.equal(pick2.owner,0);
@@ -92,4 +115,11 @@ assert.equal(D.seasonEnd(state).length,0,'Automatic decision must be idempotent'
 const other=rookies.find(p=>p.team!==0&&p.draftFifthYear);
 assert.ok(other.draftFifthYear.decided,'AI should decide fifth-year option automatically');
 assert.match(D.page(state),/THE EVALUATION LAB/);
+scope.gmDraftRealPage(1);
+assert.equal(state.draftRealismView.page,1);
+scope.gmDraftRealPosition('QB');
+assert.equal(state.draftRealismView.position,'QB');
+assert.equal(state.draftRealismView.page,0);
+scope.gmScoutPosition('WR');
+assert.equal(state.draftScoutView.position,'WR');
 console.log('PASS: 280 prospects; 224 selections; scouting accuracy; combine, Pro Day and workout; draft pick trade; 32 rookie options; option deadline; idempotent annual decisions');
