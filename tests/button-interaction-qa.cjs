@@ -4,9 +4,10 @@
  * disabled/covered buttons, and pointer-driven navigation.
  */
 'use strict';
-const {chromium}=require('playwright');
+const {chromium,webkit}=require('playwright');
 (async()=>{
- const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ const usingWebkit=process.env.BROWSER==='webkit';
+ const browser=await (usingWebkit?webkit:chromium).launch({headless:true,args:usingWebkit?[]:['--no-sandbox']});
  const context=await browser.newContext({
    viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true
  });
@@ -110,6 +111,6 @@ const {chromium}=require('playwright');
    console.log('RUNTIME EXCEPTIONS '+JSON.stringify(runtime.slice(0,30)));
    if(failures.length||runtime.length)
      throw Error(failures.length+' control errors, '+runtime.length+' runtime errors');
-   console.log('PASS button syntax and touch-navigation coverage across '+tabs.length+' screens');
+   console.log('PASS '+(usingWebkit?'WebKit':'Chromium')+' button actions and touch navigation across '+tabs.length+' screens');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exit(1)});
