@@ -331,7 +331,7 @@ function draftTradePanel(s){
    const active=selected.some(id=>String(id)===String(p.id));
    return '<div class="row" style="gap:8px;padding:8px 0"><span>Round '+p.round+
    ' · Pick '+p.slot+' · '+pickValue(p.round,p.slot,s)+' pts</span>'+
-   '<button onclick="gmDraftTradeToggle('+JSON.stringify(side)+','+JSON.stringify(p.id)+')">'+
+   '<button onclick="gmDraftTradeToggle('+esc(JSON.stringify(side))+','+esc(JSON.stringify(String(p.id)))+')">'+
    (active?'REMOVE':'ADD')+'</button></div>';
  }).join('');
  const partnerOptions=(root.TEAMS||[]).map((team,i)=>i===s.team?'':(
@@ -366,7 +366,7 @@ function page(s){
  '<h2>PROSPECT EVALUATIONS</h2><p class="muted">'+filtered.length+
  ' available prospects · Page '+(v.page+1)+' / '+pages+'</p>'+
  '<div class="filters">'+positions.map(pos=>'<button class="'+(v.position===pos?'selected':'')+
- '" onclick="gmDraftRealPosition('+JSON.stringify(pos)+')">'+pos+'</button>').join('')+'</div>'+
+ '" onclick="gmDraftRealPosition('+esc(JSON.stringify(pos))+')">'+pos+'</button>').join('')+'</div>'+
  '<div class="filters"><button onclick="gmDraftRealPage(-1)"'+(v.page===0?' disabled':'')+
  '>PREVIOUS</button> <button onclick="gmDraftRealPage(1)"'+(v.page>=pages-1?' disabled':'')+
  '>NEXT</button></div>'+
