@@ -424,10 +424,16 @@ function yearReview(s,rec,previous){
 }
 function yearPage(s,selected){
  const recaps=s.seasonRecaps||[];
- const r=recaps.find(x=>x.year===Number(selected))||recaps[0];
+ const r=recaps.find(x=>x.year===Number(selected??s.recapViewYear))||recaps[0];
  if(!r)return '<section class="gm-p7"><div class="gm-p7-hero"><h1>YEAR IN REVIEW</h1>'+
    '<p>Your championship-era yearbook will be available after the first completed season.</p></div></section>';
  const i=recaps.indexOf(r),previous=recaps[i+1],review=r.yearInReview||yearReview(s,r,previous);
+ if(root.gmImmersionExpandedYearbook&&root.GMSeasonRecap){
+   s.recapViewYear=r.year;
+   return '<section class="gm-p7"><div class="gm-p7-toolbar">'+
+     btn('← CINEMATIC YEAR IN REVIEW','gmImmersionShowStats(false)','gm-p7-selected')+
+     '</div></section>'+root.GMSeasonRecap.page(s);
+ }
  const winner=r.playoffs?.find(x=>x.round==='Super Bowl');
  const mvp=(r.awards||[]).find(a=>a.year===r.year)?.mvp||'—';
  const honors=(r.allPro||[]).filter(p=>p.team===r.team);
@@ -435,8 +441,12 @@ function yearPage(s,selected){
    '<div class="gm-p7-year-number">'+r.year+'</div><h1>YEAR IN REVIEW</h1><p>'+
    escape(review.headline)+'</p><div class="gm-p7-year-badge">'+escape(review.trajectory)+'</div></div>'+
    '<div class="gm-p7-toolbar gm-p7-year-switch">'+
-   recaps.slice(0,8).map(x=>btn(String(x.year),'gmImmersionYear('+x.year+')',
-     (x.year===r.year?'gm-p7-selected':''))).join('')+'</div>'+
+   '<label>ARCHIVED SEASON <select onchange="gmImmersionYear(this.value)">'+
+   recaps.map(x=>'<option value="'+x.year+'"'+(x.year===r.year?' selected':'')+'>'+x.year+'</option>').join('')+
+   '</select></label>'+
+   recaps.slice(0,CONFIG.year.maxYearButtons).map(x=>btn(String(x.year),
+     'gmImmersionYear('+x.year+')',(x.year===r.year?'gm-p7-selected':''))).join('')+
+   btn('FULL STATISTICAL YEARBOOK','gmImmersionShowStats(true)')+'</div>'+
    '<div class="gm-p7-metrics"><div><small>SEASON RECORD</small><strong>'+
    escape(review.record)+'</strong></div><div><small>LEAGUE RANK</small><strong>#'+
    review.leagueRank+'</strong></div><div><small>ALL-PRO SELECTIONS</small><strong>'+
@@ -489,7 +499,13 @@ root.gmImmersionGameYear=year=>{const y=Number(year),years=gameResults(state).ma
  state.immersionGameView={year:y,id:null};render()};
 root.gmImmersionInjuryAll=false;
 root.gmImmersionInjuryScope=all=>{root.gmImmersionInjuryAll=!!all;render()};
-root.gmImmersionYear=year=>{root.gmImmersionSelectedYear=year;render()};
+root.gmImmersionYear=year=>{
+ const y=Number(year);
+ if(!Number.isInteger(y)||!(state.seasonRecaps||[]).some(x=>x.year===y))return;
+ root.gmImmersionSelectedYear=y;
+ state.recapViewYear=y;render();
+};
+root.gmImmersionShowStats=value=>{root.gmImmersionExpandedYearbook=!!value;render()};
 root.pressConference=()=>{page='Press Room';render()};
 const previousRender=render;
 render=function(){
