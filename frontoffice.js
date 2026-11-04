@@ -11,7 +11,13 @@ function init(){
  const f=state.frontOffice;
  if(f.season!==state.year){f.season=state.year;f.prospects=[];f.picks=[];f.scouted={};f.draftLog=[];f.offers=[];f.selectedOut=[];f.selectedIn=[];f.round=1;f.clock=0;f.draftStarted=false}
  if(!f.picks.length&&!f.draftStarted){for(let round=1;round<=7;round++)for(let slot=1;slot<=TEAMS.length;slot++)f.picks.push({id:state.year+'-'+round+'-'+slot,round,slot,owner:slot-1,original:slot-1,used:false})}
- if(window.GMDraftRealism&&!f.draftStarted)window.GMDraftRealism.generate(state,f.prospects);
+ // Migrate legacy 130-player classes even after draft night has started;
+ // generate only once per class to keep mobile re-renders inexpensive.
+ if(window.GMDraftRealism&&(f.realismReadyYear!==state.year||
+    f.prospects.length<GMDraftRealism.prospectsNeeded(state))){
+   window.GMDraftRealism.generate(state,f.prospects);
+   f.realismReadyYear=state.year;
+ }
  if(!f.prospects.length&&!f.draftStarted){
   let first=['Mason','Jalen','Eli','Tyrese','Andre','Malik','Carter','Devin','Noah','Darius','Cole','Bryce','Landon','Kendrick','Jordan','Micah','Dante','Trey'],last=['Holloway','Mercer','Bennett','Sullivan','Bishop','Jefferson','Coleman','Porter','Rivers','Hayes','McCall','Griffin','Walker','Fields','Brooks','King'];
   for(let i=0;i<130;i++){let pos=allPos[i%10],trueRating=rand(56,83),potential=c(trueRating+rand(3,17),60,99),id='rookie-'+state.year+'-'+i;f.prospects.push({id,name:first[rand(0,first.length-1)]+' '+last[rand(0,last.length-1)],pos,age:rand(20,23),rating:trueRating,pot:potential,athletic:rand(55,99),medical:rand(50,100),character:rand(50,100),dev:potential-trueRating>12?'Elite':potential-trueRating>7?'Star':'Normal',projection:Math.round(trueRating+rand(-13,13)),tier:c(Math.ceil((88-trueRating)/6),1,6)})}
