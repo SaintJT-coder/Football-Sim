@@ -90,6 +90,12 @@ for(let season=0;season<seasons;season++){
    savedMiB:+(bytes/1048576).toFixed(2),salaryCap:cap};
  metrics.push(row);
  console.log('SEASON '+JSON.stringify(row));
+ if(bytes>=4*1024*1024){
+   const largest=Object.entries(state)
+     .map(([key,val])=>({key,MiB:+(Buffer.byteLength(JSON.stringify(val),'utf8')/1048576).toFixed(3)}))
+     .sort((a,b)=>b.MiB-a.MiB).slice(0,12);
+   console.log('STATE SIZE BREAKDOWN '+year+' '+JSON.stringify(largest));
+ }
  assert.ok(Number.isFinite(cap),'Salary cap became nonfinite');
  assert.ok(active>0,'User has no contracted players');
  assert.ok(bytes<5*1024*1024,'Save exceeds 5 MiB safety budget');
