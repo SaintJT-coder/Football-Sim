@@ -44,7 +44,8 @@ jobs:
                           tests/presentation-priority7-smoke.js \
                           tests/qa-menu-roster-scouting-smoke.js \
                           tests/full-engine-integration-smoke.js \
-                          tests/save-recovery-qa-smoke.js; do
+                          tests/save-recovery-qa-smoke.js \
+                          tests/legacy-save-import-qa-smoke.js; do
             echo "::group::Running $testfile"
             node "$testfile"
             result=$?
