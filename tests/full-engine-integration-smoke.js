@@ -57,6 +57,14 @@ scope.simulate();
 assert.equal(state.year,2026);
 assert.equal(state.week,2);
 assert.equal(state.results.filter(g=>g.year===2026).length,16);
+// Passing TDs must be credited to receivers as well as the passer.
+for(const team of Array.from({length:32},(_,i)=>i)){
+ const roster=state.players.filter(p=>p.team===team);
+ const pass=roster.filter(p=>p.pos==='QB').reduce((n,p)=>n+(p.stats.passTD||0),0);
+ const receiving=roster.filter(p=>p.pos==='WR'||p.pos==='TE')
+   .reduce((n,p)=>n+(p.stats.recTD||0),0);
+ assert.equal(receiving,pass,'Missing receiving touchdowns for team '+team);
+}
 assert.equal(state.immersionPress.active.questions.length,3);
 assert.equal(state.leagueNarratives.processedGames.length,16);
 assert.ok(Object.keys(state.leagueNarratives.careerRecords).length>0);
