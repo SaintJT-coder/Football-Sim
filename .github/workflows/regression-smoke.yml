@@ -19,4 +19,6 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - name: Run existing mobile browser regression
-        run: node tests/smoke.cjs
+        run: |
+          node tests/smoke.cjs
+          node tests/button-interaction-qa.cjs
