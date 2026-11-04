@@ -27,6 +27,7 @@ class Element {
   this.textContent='';this.id='';this.innerHTML='';
  }
  setAttribute(k,v){this.attributes[k]=v}
+ addEventListener(){}
  append(...parts){this.children.push(...parts)}
  appendChild(item){this.children.push(item)}
  remove(){this.removed=true}
@@ -54,8 +55,11 @@ window.showFirstPickBroadcast(
 );
 const overlay=document.body.lastChild;
 assert.equal(overlay.id,'dn-first-pick-broadcast','Animation overlay missing');
-assert.equal(overlay.children.length,2,'Expected iframe and close button');
-const [frame,close]=overlay.children;
+assert.equal(overlay.children.length,4,'Expected iframe, status, close and replay controls');
+const [frame,status,close,replay]=overlay.children;
+assert.equal(status.attributes.role,'status');
+assert.equal(replay.tag,'button');
+assert.equal(typeof replay.onclick,'function');
 assert.equal(frame.tag,'iframe');
 assert.equal(frame.attributes.sandbox,'allow-scripts');
 assert.match(frame.srcdoc,/id="c"/);
