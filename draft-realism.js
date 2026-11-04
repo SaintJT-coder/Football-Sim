@@ -16,7 +16,7 @@ const CONFIG={
  pickChart:{anchors:[[1,3000],[2,2600],[3,2200],[4,1800],[5,1700],[10,1300],[16,1000],[24,740],[32,590],[40,500],[48,420],[64,270],[80,190],[96,116],[112,70],[128,44],[160,28],[192,16],[224,2]],lastPick:224},
  risk:{medicalRate:.13,highConcernPenalty:4},
 
- trade:{margin:1.08,positionNeedMax:1.18,positionNeedMin:.92,roundPremium:1.02},
+ trade:{margin:1.08,positionNeedMax:1.18,positionNeedMin:.92,roundPremium:1.02,maxPicksPerSide:6},
  fifthYear:{length:4,optionYear:5,deadlineSeasonOffset:2,
    salaryMultiplier:1.4,salaryFloor:5,exerciseMinRating:77,autoDecisionWeek:18},
  ui:{display:64,showAfterDraft:20}
@@ -209,27 +209,42 @@ function valueFor(s,pick,receiver){
  CONFIG.trade.positionNeedMin,CONFIG.trade.positionNeedMax);
  return Math.round(pickValue(pick.round,pick.slot,s)*weight);
 }
+function quoteTrade(s,giveIds,receiveIds,other){
+ const f=s.frontOffice,teamCount=root.TEAMS?.length||32;
+ if(!f?.picks?.length||!Number.isInteger(other)||other<0||other>=teamCount||
+   other===s.team)return {ok:false,error:'Invalid draft trade partner'};
+ if(!Array.isArray(giveIds)||!Array.isArray(receiveIds)||
+   !giveIds.length||!receiveIds.length||
+   giveIds.length>CONFIG.trade.maxPicksPerSide||
+   receiveIds.length>CONFIG.trade.maxPicksPerSide)
+   return {ok:false,error:'Select 1–'+CONFIG.trade.maxPicksPerSide+' picks on each side'};
+ const keys=[...giveIds,...receiveIds].map(String);
+ if(new Set(keys).size!==keys.length)return {ok:false,error:'Duplicate pick in offer'};
+ const give=giveIds.map(id=>f.picks.find(p=>String(p.id)===String(id)));
+ const receive=receiveIds.map(id=>f.picks.find(p=>String(p.id)===String(id)));
+ if(give.some(p=>!p||p.used||p.owner!==s.team)||
+   receive.some(p=>!p||p.used||p.owner!==other))
+   return {ok:false,error:'Unavailable or changed draft-pick ownership'};
+ const offered=give.reduce((n,p)=>n+valueFor(s,p,other),0);
+ const requested=receive.reduce((n,p)=>n+valueFor(s,p,s.team),0);
+ const required=Math.ceil(requested*CONFIG.trade.margin);
+ return {ok:true,offered,requested,required,accepted:offered>=required,
+   give,receive,ratio:requested?round(offered/requested,2):0};
+}
 function tradePicks(s,giveIds,receiveIds,other){
- const f=s.frontOffice;
- if(!f?.picks?.length||!Number.isInteger(other)||other<0||other>= (root.TEAMS?.length||32)||
-   other===s.team)return {ok:false,error:'Invalid trade partner'};
- if(!Array.isArray(giveIds)||!Array.isArray(receiveIds)||!giveIds.length||
-   !receiveIds.length)return {ok:false,error:'Choose picks on both sides'};
- const give=giveIds.map(id=>f.picks.find(p=>p.id===id)),receive=receiveIds.map(id=>f.picks.find(p=>p.id===id));
- const unique=new Set([...giveIds,...receiveIds]);
- if(unique.size!==give.length+receive.length||give.some(p=>!p||p.used||p.owner!==s.team)||
-   receive.some(p=>!p||p.used||p.owner!==other))return {ok:false,error:'Picks are unavailable or ownership changed'};
- const offer=give.reduce((n,p)=>n+valueFor(s,p,other),0),
-   demand=receive.reduce((n,p)=>n+valueFor(s,p,s.team),0)*CONFIG.trade.margin;
- if(offer<demand)return {ok:false,error:'AI rejects offer: add pick value',
-   offered:offer,required:Math.ceil(demand)};
- for(const p of give)p.owner=other;
- for(const p of receive)p.owner=s.team;
+ const quote=quoteTrade(s,giveIds,receiveIds,other);
+ if(!quote.ok)return quote;
+ if(!quote.accepted)return {ok:false,error:'AI rejects offer: add pick value',
+   offered:quote.offered,required:quote.required};
+ for(const p of quote.give)p.owner=other;
+ for(const p of quote.receive)p.owner=s.team;
  const entry={year:s.year,week:s.week,other,kind:'DRAFT_PICK_TRADE',
-   give:give.map(x=>x.id),receive:receive.map(x=>x.id),offered:offer,required:Math.ceil(demand)};
- f.tradeLog.unshift(entry);
+   give:quote.give.map(x=>x.id),receive:quote.receive.map(x=>x.id),
+   offered:quote.offered,required:quote.required};
+ s.frontOffice.tradeLog??=[];
+ s.frontOffice.tradeLog.unshift(entry);
  s.news?.unshift('Draft-day trade: '+(root.TEAMS?.[s.team]?.[1]||'Your team')+
-   ' exchanged '+give.length+' pick(s) with '+(root.TEAMS?.[other]?.[1]||'an AI club')+'.');
+   ' exchanged '+quote.give.length+' pick(s) with '+(root.TEAMS?.[other]?.[1]||'an AI club')+'.');
  return {ok:true,...entry};
 }
 function rookieContract(p,s,round,slot){
@@ -326,7 +341,7 @@ function page(s){
 }
 root.GMDraftRealism={CONFIG,create,enrich,generate,prospectsNeeded,accuracy,staffQuality,
  estimated,scout,combine,proDay,workout,resources,publicGrade,draftValue,
- pickValue,positionalNeed,tradePicks,rookieContract,decideFifthYear,seasonEnd,page};
+ pickValue,positionalNeed,quoteTrade,tradePicks,rookieContract,decideFifthYear,seasonEnd,page};
 root.Gridiron?.register?.('draftRealism',root.GMDraftRealism);
 root.gmDraftRealAction=(id,action)=>{
  const p=state.frontOffice?.prospects?.find(p=>String(p.id)===String(id));
