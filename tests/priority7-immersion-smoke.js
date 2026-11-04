@@ -39,6 +39,7 @@ function load(file){
 load('franchise-systems.js');
 load('roster-rules.js');
 load('simulation-presentation.js');
+load('season-recap.js');
 load('gridiron-saves.js');
 load('presentation-immersion.js');
 const immersion=scope.GMImmersion,save=scope.GMSaveManager;
@@ -115,11 +116,17 @@ assert.ok(immersion.gameCenterPage(state).includes('WEEK 1'));
 state.seasonRecaps=[{
  year:2026,team:0,standings:[{team:0,wins:12,losses:5}],
  playoffs:[{round:'Super Bowl',a:0,b:1,sa:31,sb:24}],
- allPro:[],awards:[{year:2026,mvp:'Test MVP'}],
+ allPro:[],allConference:[],records:[],awards:[{year:2026,mvp:'Test MVP'}],
  leaders:[{label:'Passing Yards',leaders:[{name:'Test QB',team:0,value:4300}]}],
  leagueStories:[]}];
 assert.ok(immersion.yearPage(state,2026).includes('YEAR IN REVIEW'));
 assert.ok(immersion.yearPage(state,2026).includes('Test MVP'));
+assert.ok(immersion.yearPage(state,2026).includes('FULL STATISTICAL YEARBOOK'));
+assert.ok(immersion.yearPage(state,2026).includes('ARCHIVED SEASON'));
+scope.gmImmersionShowStats(true);
+assert.ok(immersion.yearPage(state,2026).includes('FINAL STANDINGS'));
+scope.gmImmersionShowStats(false);
+assert.ok(immersion.yearPage(state,2026).includes('YEAR IN REVIEW'));
 
 // Creating a branch captures a clean parent and all future edits stay isolated.
 save.bootstrap(state);
@@ -140,6 +147,8 @@ assert.equal(diff.sameSeason,true);
 assert.ok(save.labPage(modified).includes('WHAT IF LAB'));
 assert.ok(save.labPage(modified).includes('ORIGINAL RECORD'));
 assert.ok(save.labPage(modified).includes('ROSTER RATING'));
+assert.ok(save.labPage(modified).includes('gmLoadSlot(&quot;'),
+ 'Timeline links must use HTML-escaped string IDs');
 assert.equal(save.activate(original).cash,originalCash,
  'Original timeline must remain unchanged');
 assert.equal(save.activate(fork.id).cash,originalCash+47,
