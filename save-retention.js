@@ -32,7 +32,7 @@ function compact(s){
    const keep=[];
    for(const report of media.gameReports){
      const franchise=report.a===s.team||report.b===s.team;
-     if(franchise?++own>24:++other>16){removed++;continue}
+     if(franchise?++own>20:++other>16){removed++;continue}
      if(Array.isArray(report.leaders)){
        for(const leader of report.leaders){
          if(Object.hasOwn(leader,'stats')){delete leader.stats;removed++}
@@ -44,9 +44,9 @@ function compact(s){
      keep.push(report);
    }
    media.gameReports=keep;
-   removed+=trim(media.pressConferences,50);
+   removed+=trim(media.pressConferences,30);
    for(const rivalry of Object.values(media.rivalries||{}))
-     removed+=trimTail(rivalry?.results,4);
+     removed+=trimTail(rivalry?.results,2);
  }
  return {entriesPruned:removed,playersExamined:s.players.length};
 }
