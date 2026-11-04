@@ -95,6 +95,15 @@ for(let season=0;season<seasons;season++){
      .map(([key,val])=>({key,MiB:+(Buffer.byteLength(JSON.stringify(val),'utf8')/1048576).toFixed(3)}))
      .sort((a,b)=>b.MiB-a.MiB).slice(0,12);
    console.log('STATE SIZE BREAKDOWN '+year+' '+JSON.stringify(largest));
+   const playerFields={};
+   for(const player of state.players)for(const [key,value] of Object.entries(player)){
+     playerFields[key]=(playerFields[key]||0)+
+       Buffer.byteLength(JSON.stringify(value),'utf8')+key.length+4;
+   }
+   console.log('PLAYER FIELD SIZES '+year+' '+JSON.stringify(Object.entries(playerFields)
+      .map(([key,size])=>({key,MiB:+(size/1048576).toFixed(3)}))
+      .sort((a,b)=>b.MiB-a.MiB).slice(0,18)));
+
  }
  assert.ok(Number.isFinite(cap),'Salary cap became nonfinite');
  assert.ok(active>0,'User has no contracted players');
