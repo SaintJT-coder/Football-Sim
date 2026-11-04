@@ -101,7 +101,7 @@ const {chromium}=require('playwright');
      liveChecks.push('Weekly practice focus');
    }else failures.push('Weekly practice focus button unavailable');
    await openTab('Advanced Scouting');
-   await page.locator('#app button[onclick="gmScoutPosition(\\\"QB\\\")"]').click();
+   await page.locator('#app button[onclick^="gmScoutPosition("]').filter({hasText:'QB'}).first().click();
    liveChecks.push('Advanced scouting position filter');
    console.log('LIVE ACTION CHECKS '+JSON.stringify(liveChecks));
    console.log('BUTTON COUNTS '+JSON.stringify(counts));
