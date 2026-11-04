@@ -17,7 +17,7 @@ jobs:
       - name: Install browser test dependency
         run: npm install --no-save playwright
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
       - name: Verify public GitHub Pages delivery
         run: |
           python3 - <<'PY'
@@ -42,3 +42,4 @@ jobs:
         run: |
           node tests/smoke.cjs
           node tests/button-interaction-qa.cjs
+          BROWSER=webkit node tests/button-interaction-qa.cjs
