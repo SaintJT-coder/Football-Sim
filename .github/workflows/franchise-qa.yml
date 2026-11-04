@@ -52,6 +52,7 @@ jobs:
                           tests/draft-presentation-qa-smoke.js \
                           tests/branch-delete-qa-smoke.js \
                           tests/multiseason-stress-qa-smoke.js \
+                          tests/retirement-archive-qa-smoke.js \
                           tests/full-page-startup-qa-smoke.js; do
             echo "::group::Running $testfile"
             node "$testfile"
