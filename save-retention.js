@@ -32,7 +32,7 @@ function compact(s){
    const keep=[];
    for(const report of media.gameReports){
      const franchise=report.a===s.team||report.b===s.team;
-     if(franchise?++own>24:++other>12){removed++;continue}
+     if(franchise?++own>24:++other>16){removed++;continue}
      if(Array.isArray(report.leaders)){
        for(const leader of report.leaders){
          if(Object.hasOwn(leader,'stats')){delete leader.stats;removed++}
