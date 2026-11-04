@@ -194,7 +194,7 @@ function ballot(s){
    const total=100*(cfg.stats*score/Math.max(1,scale)+cfg.wins*success+cfg.scarcity*scarcity);
    return {id:p.id,name:p.name,pos:p.pos,team:p.team,rating:p.rating,age:p.age,
      rookie:!!(p.rookieDraft?p.rookieDraft.year===s.year:(p.rookie&&p.age<=23)),
-     score:Math.round(total*10)/10,
+     teamName:club(p.team),score:Math.round(total*10)/10,
      statsScore:Math.round(score/Math.max(1,scale)*100),teamPct:Math.round(success*100)};
  }).sort((a,b)=>b.score-a.score||String(a.id).localeCompare(String(b.id)));
  const select=(pool,counts)=>Object.entries(counts).flatMap(([pos,count])=>
@@ -240,6 +240,110 @@ function seasonEnd(s){
    ' of '+club(result.mvp.team)+' wins on statistics and team success.');
  return result;
 }
+
+function awardsPage(s){
+ const d=init(s),years=[s.year,...d.honors.map(x=>x.year)].filter((y,i,a)=>a.indexOf(y)===i);
+ const year=years.includes(Number(d.awardsViewYear))?Number(d.awardsViewYear):s.year;
+ const final=d.honors.find(h=>h.year===year);
+ const result=final||(year===s.year?ballot(s):null),status=final?'FINAL AWARDS':'LIVE AWARD WATCH';
+ const choice=years.map(y=>'<option value="'+y+'"'+(year===y?' selected':'')+'>'+
+   y+(d.honors.some(h=>h.year===y)?' · Final':' · In progress')+'</option>').join('');
+ const winner=(label,p)=>'<div class="card"><div class="eyebrow">'+esc(label)+'</div>'+
+   '<h2>'+esc(p?.name||'Not yet awarded')+'</h2>'+
+   '<p class="muted">'+esc(p?.pos||'')+' · '+esc(p?.teamName||(
+     p?.team!=null?club(p.team):''))+'</p>'+
+   (p?'<p>Ballot '+Number(p.score||0).toFixed(1)+' / 100 · Stats '+
+     Number(p.statsScore||0)+' · Team wins '+Number(p.teamPct||0)+'%</p>':'')+'</div>';
+ const proBowl=(result?.proBowlByConference||[]).map(c=>
+   '<div class="card"><h3>'+esc(c.conference)+' PRO BOWL</h3>'+
+   (c.players||[]).map(p=>'<p>'+esc(p.pos)+' · '+esc(p.name)+' · '+
+     esc(p.teamName||club(p.team))+'</p>').join('')+'</div>').join('');
+ return '<div class="eyebrow">GRIDIRON HONORS · '+status+'</div>'+
+   '<h1 class="heading">LEAGUE AWARDS</h1>'+
+   '<p class="sub">Performance-based voting weights statistics, team success and positional competition. Awards become permanent after the championship.</p>'+
+   '<label>Season <select onchange="gmSetLeagueAwardsYear(this.value)">'+choice+'</select></label>'+
+   '<div class="grid two">'+[
+     ['MOST VALUABLE PLAYER',result?.mvp],['OFFENSIVE PLAYER',result?.offense],
+     ['DEFENSIVE PLAYER',result?.defense],['OFFENSIVE ROOKIE',result?.rookie]
+   ].map(([label,p])=>winner(label,p)).join('')+'</div>'+
+   '<h2>ALL-PRO FIRST TEAM</h2><div class="grid two">'+
+   ((result?.allPro||[]).map(p=>'<div class="card"><b>'+esc(p.pos)+' · '+esc(p.name)+
+     '</b><p>'+esc(p.teamName||club(p.team))+' · '+Number(p.score||0).toFixed(1)+
+     ' vote points</p></div>').join('')||'<div class="card">Qualifying players appear after games are simulated.</div>')+
+   '</div><h2>CONFERENCE PRO BOWL TEAMS</h2><div class="grid two">'+proBowl+'</div>'+
+   '<h2>VOTING LEADERBOARD</h2><div class="card">'+
+   ((result?.votes||[]).slice(0,25).map((p,i)=>
+     '<p><b>#'+(i+1)+' '+esc(p.name)+'</b> · '+esc(p.pos)+' · '+
+     esc(p.teamName||club(p.team))+' · '+Number(p.score||0).toFixed(1)+
+     ' / 100</p>').join('')||'No votes yet.')+'</div>';
+}
+function historyPage(s){
+ const d=init(s),years=[...new Set([...(s.history||[]).map(h=>h.year),
+   ...d.honors.map(h=>h.year),...d.champions.map(c=>c.year)])].sort((a,b)=>b-a);
+ const rows=years.map(year=>{
+   const old=(s.history||[]).find(h=>h.year===year),c=d.champions.find(h=>h.year===year),
+     honors=d.honors.find(h=>h.year===year);
+   return '<div class="card"><div class="eyebrow">SEASON '+year+'</div>'+
+     '<h3>CHAMPIONS · '+esc(c?.teamName||old?.champ||'Not recorded')+'</h3>'+
+     '<p>Runner-up: '+esc(c?.runnerName||old?.runner||'—')+'</p>'+
+     '<p>MVP: '+esc(honors?.mvp?.name||'—')+
+     ' · Offensive Player: '+esc(honors?.offense?.name||'—')+
+     ' · Defensive Player: '+esc(honors?.defense?.name||'—')+
+     ' · Rookie: '+esc(honors?.rookie?.name||'—')+'</p>'+
+     '<p class="muted">All-Pro selections: '+(honors?.allPro?.length||0)+
+     ' · Pro Bowl selections: '+(honors?.proBowlByConference||[]).reduce((n,c)=>n+(c.players?.length||0),0)+'</p></div>';
+ }).join('');
+ const dynasty=Object.entries(d.champions.reduce((counts,c)=>{
+   const key=c.team+':'+c.teamName;
+   counts[key]=(counts[key]||0)+1;return counts;
+ },{})).sort((a,b)=>b[1]-a[1]);
+ const marked=Object.values(d.teamRecords).sort((a,b)=>b.year-a.year);
+ return '<div class="eyebrow">GRIDIRON ARCHIVES</div><h1 class="heading">LEAGUE HISTORY</h1>'+
+   '<p class="sub">Championships, annual honors, record seasons, and growing franchise dynasties.</p>'+
+   '<div class="grid three"><div class="card"><h3>SEASONS COMPLETED</h3><h2>'+years.length+'</h2></div>'+
+   '<div class="card"><h3>CHAMPIONS CROWNED</h3><h2>'+d.champions.length+'</h2></div>'+
+   '<div class="card"><h3>HONORS ARCHIVED</h3><h2>'+d.honors.length+'</h2></div></div>'+
+   '<h2>CHAMPIONSHIP & AWARD YEARBOOK</h2>'+
+   (rows||'<div class="card">Complete a season to start your league history.</div>')+
+   '<h2>DYNASTIES</h2><div class="card">'+
+   (dynasty.map(([key,value])=>'<p><b>'+esc(key.slice(key.indexOf(':')+1))+
+     '</b> · '+value+' championship'+(value===1?'':'s')+'</p>').join('')||
+     'Dynasties begin with the first championship.')+'</div>'+
+   '<h2>TEAM RECORD BOOK</h2><div class="grid two">'+
+   (marked.map(r=>'<div class="card"><h3>'+esc(r.kind)+'</h3><b>'+r.value+
+     '</b> · '+esc(r.teamName||club(r.team))+' · '+r.year+'</div>').join('')||
+     '<div class="card">Team records arrive after the first games.</div>')+'</div>';
+}
+function hallPage(s){
+ const db=s.simPresentation||{},ballots=db.hallOfFameBallots||[],all=new Set(),
+   classes=[];
+ for(const b of ballots)for(const item of b.inductees||[]){
+   const key=String(item.id);
+   if(all.has(key))continue;
+   all.add(key);classes.push({year:b.year,...item});
+ }
+ classes.sort((a,b)=>b.year-a.year||b.score-a.score);
+ const recent=ballots[0],retired=s.retired||[];
+ const playerSummary=item=>{
+   const p=retired.find(p=>String(p.id)===String(item.id));
+   return '<div class="card"><h3>'+esc(item.name)+'</h3>'+
+     '<p>Class of '+item.year+' · Hall score '+Number(item.score||0)+'</p>'+
+     (p?'<p>'+esc(p.pos)+' · Career passing '+num(p.careerStats?.passYards)+
+       ' · Rushing '+num(p.careerStats?.rushYards)+
+       ' · Receiving '+num(p.careerStats?.receivingYards)+
+       ' · Honors '+(p.careerHonors||[]).length+'</p>':'')+'</div>';
+ };
+ return '<div class="eyebrow">GRIDIRON LEGENDS</div><h1 class="heading">HALL OF FAME</h1>'+
+   '<p class="sub">Retired players become eligible for voting after two seasons. Only voted-in inductees receive a place in the Hall.</p>'+
+   '<div class="grid three"><div class="card"><h3>INDUCTEES</h3><h2>'+classes.length+
+     '</h2></div><div class="card"><h3>INDUCTION CLASSES</h3><h2>'+ballots.length+
+     '</h2></div><div class="card"><h3>RETIRED PLAYERS</h3><h2>'+retired.length+'</h2></div></div>'+
+   '<h2>INDUCTION WALL</h2><div class="grid two">'+
+   (classes.map(playerSummary).join('')||'<div class="card">No players have been inducted yet.</div>')+'</div>'+
+   '<h2>LATEST BALLOT</h2><div class="card">'+
+   (recent?.candidates?.map(p=>'<p>'+esc(p.name)+' · Hall score '+p.score+
+     ' · '+p.votes+'% ballots</p>').join('')||'Candidates appear after eligible retirements.')+'</div>';
+}
 function page(s){
  const d=init(s),latest=d.honors[0],
    top=(v,n=8)=>Object.values(v).slice().sort((a,b)=>b.value-a.value).slice(0,n),
@@ -272,9 +376,20 @@ function page(s){
    '<h2>FRANCHISE RECORDS</h2>'+
     (top(Object.fromEntries(Object.entries(d.franchiseRecords)
       .filter(([key,r])=>r.team===s.team)),12).map(recordRow).join('')||
-     '<div class="card">Your franchise records appear after games.</div>');
+     '<div class="card">Your franchise records appear after games.</div>')+
+   '<h2>ALL-TIME SINGLE-GAME RECORDS</h2>'+
+   (top(d.gameRecords,10).map(recordRow).join('')||'<div class="card">Game records appear after games.</div>')+
+   '<h2>TEAM RECORDS</h2>'+
+   (top(d.teamRecords,8).map(r=>'<div class="card"><b>'+esc(r.teamName||club(r.team))+
+     '</b> · '+esc(r.kind)+' <strong>'+r.value+'</strong> · '+r.year+'</div>').join('')||
+     '<div class="card">Team records appear after games.</div>');
 }
 root.GMLeagueNarratives={CONFIG,init,snap,story,record,teamMark,championship,afterGame,teamRecord,
- weekly,ballot,seasonEnd,page};
+ weekly,ballot,seasonEnd,page,awardsPage,historyPage,hallPage};
+root.gmSetLeagueAwardsYear=year=>{
+ const d=init(state),candidate=Number(year);
+ if(!Number.isInteger(candidate)||candidate<1900||candidate>2500)return;
+ d.awardsViewYear=candidate;render();
+};
 root.Gridiron?.register?.('leagueNarratives',root.GMLeagueNarratives);
 })(window);
