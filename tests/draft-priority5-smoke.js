@@ -36,8 +36,8 @@ assert.equal(office.picks.length,224);
 assert.equal(office.prospects.length,280);
 const counts=Object.fromEntries(POS.map(pos=>[pos,office.prospects.filter(p=>p.pos===pos).length]));
 assert.ok(Object.values(counts).every(n=>n===28),'Draft class should cover all positions evenly');
-assert.match(scope.GMDraftAdvanced.page(state),/gmScoutAction\("rookie-2026-0"/,
- 'String prospect IDs must be quoted inside scouting controls');
+assert.match(scope.GMDraftAdvanced.page(state),/gmScoutAction\(&quot;rookie-2026-\d+&quot;/,
+ 'Scouting IDs must be properly quoted and HTML-escaped');
 assert.equal(office.picks.filter(p=>p.owner===state.team).length,7);
 const p=office.prospects[0];
 const before=D.publicGrade(p,state),start=state.upgrades.scoutPoints;
@@ -81,6 +81,10 @@ const quote=D.quoteTrade(state,[pick1.id],[pick2.id],1);
 assert.ok(quote.ok&&quote.accepted);
 assert.equal(D.quoteTrade(state,[pick1.id],[pick1.id],1).ok,false);
 assert.match(D.page(state),/LIVE PICK SWAP BUILDER/);
+assert.match(D.page(state),/gmDraftTradeToggle\(&quot;give&quot;,&quot;2026-1-1&quot;\)/,
+ 'Trade builder must escape string IDs inside onclick attributes');
+assert.match(D.page(state),/gmDraftRealPosition\(&quot;QB&quot;\)/,
+ 'Position filters must escape JS arguments inside onclick attributes');
 const swap=D.tradePicks(state,[pick1.id],[pick2.id],1);
 assert.equal(swap.ok,true,'Better early pick should satisfy pick trade margin');
 assert.equal(pick1.owner,1);assert.equal(pick2.owner,0);
