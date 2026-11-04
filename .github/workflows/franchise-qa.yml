@@ -56,6 +56,7 @@ jobs:
                           tests/scheme-cache-qa-smoke.js \
                           tests/save-retention-qa-smoke.js \
                           tests/roster-autocuts-qa-smoke.js \
+                          tests/freeagent-lifecycle-qa-smoke.js \
                           tests/full-page-startup-qa-smoke.js; do
             echo "::group::Running $testfile"
             node "$testfile"
