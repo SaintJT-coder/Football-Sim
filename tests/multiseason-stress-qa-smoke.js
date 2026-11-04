@@ -62,6 +62,12 @@ for(let season=0;season<seasons;season++){
  const draftPicks=state.frontOffice.draftLog.length;
  assert.equal(draftPicks,224,'Seven-round draft not completed for '+year);
  assert.equal(state.players.length,beforeDraft+224,'Rookie player count for '+year);
+ const activeBeforeCuts=scope.GMRosterRules.count(state,state.team).ACTIVE;
+ if(activeBeforeCuts>53){
+   const cuts=scope.GMRosterRules.autoPracticeCuts(state,state.team);
+   assert.equal(cuts.ok,true,'Cannot make valid 53-man practice squad cuts');
+   assert.equal(scope.GMRosterRules.count(state,state.team).ACTIVE,53);
+ }
  for(let week=1;week<=18;week++){
    assert.equal(state.week,week,'Simulation stalled in '+year+' W'+week);
    try{scope.simulate()}catch(e){
