@@ -1,6 +1,6 @@
 /* Simulation & Presentation 2.0 — additive vanilla JavaScript. */
 (function(root){'use strict';
-const CONFIG={reportRetention:{franchise:100,otherTeams:64}};
+const CONFIG={reportRetention:{franchise:60,otherTeams:24}};
 function compactReports(s,db){
  const next=[];let own=0,other=0;
  for(const entry of db.gameReports){
