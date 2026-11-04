@@ -18,7 +18,8 @@ const CONFIG={
  depth:{positionGroups:{OFFENSE:['QB','RB','WR','TE','OL'],
    DEFENSE:['DL','LB','CB','S'],SPECIAL:['K']},visiblePerPosition:5},
  health:{questionableWeeks:1,returningWeeks:2},
- year:{maxSurprises:3}
+ year:{maxSurprises:3,maxYearButtons:8},
+ gameCenter:{maxGames:80,maxInjuryNotes:5,quarterLabels:['Q1','Q2','Q3','Q4'],maxLeaders:6}
 };
 const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,Number(x)||0));
@@ -194,7 +195,8 @@ function setStarter(s,pos,id){
 function depthPage(s){
  const groups=CONFIG.depth.positionGroups;
  const roster=s.players.filter(p=>p.team===s.team);
- const healthy=roster.filter(p=>Number(p.injury||0)<=0).length;
+ const healthy=roster.filter(p=>Number(p.injury||0)<=0&&
+   !['IR','PUP','PRACTICE'].includes(p.rosterStatus)&&!p.contractAdvanced?.holdout).length;
  return '<section class="gm-p7"><div class="gm-p7-hero"><div class="gm-p7-eyebrow">FRANCHISE OPERATIONS • PLAYER PERSONNEL</div>'+
    '<h1>DEPTH CHART</h1><p>Who takes the field? Set starters and track backup quality, health and availability.</p></div>'+
    '<div class="gm-p7-metrics"><div><small>ROSTERED</small><strong>'+roster.length+'</strong></div>'+
@@ -204,19 +206,31 @@ function depthPage(s){
      '<h2 class="gm-p7-heading">'+group+' UNIT</h2><div class="gm-p7-position-grid">'+
      positions.map(pos=>{
        const candidates=depthData(s,pos).slice(0,CONFIG.depth.visiblePerPosition);
+       const actualStarter=candidates.find(p=>status(p)==='AVAILABLE'&&
+         p.rosterStatus!=='PRACTICE'&&!p.contractAdvanced?.holdout);
+       const starterRating=Number(actualStarter?.rating||0);
        return '<article class="gm-p7-unit"><header><strong>'+escape(pos)+'</strong>'+
          '<span>'+candidates.length+' DEPTH</span></header>'+
          (candidates.map((p,i)=>{
-           const condition=status(p),available=condition==='AVAILABLE',
-             starter=i===0&&available;
+           const condition=status(p),available=condition==='AVAILABLE'&&
+             p.rosterStatus!=='PRACTICE'&&!p.contractAdvanced?.holdout,
+             starter=!!actualStarter&&String(actualStarter.id)===String(p.id),
+             fit=root.GMFranchise?.fit(p,root.GMFranchise?.scheme(s,s.team,
+               ['DL','LB','CB','S'].includes(pos)?'defense':'offense'))??null,
+             projected=Number(p.rating||0)-Number(p.fatigue||0)*.13,
+             ratingDelta=starter?0:Number(p.rating||0)-starterRating;
            return '<div class="gm-p7-player '+(starter?'gm-p7-starter':'')+'">'+
              '<div class="gm-p7-ovr">'+Math.round(p.rating||0)+'</div>'+
              '<div class="gm-p7-player-name"><b>'+escape(p.name)+'</b><small>'+
-             (i===0?'STARTER':'DEPTH '+(i+1))+' • '+escape(condition)+
-             ' • '+Math.round(p.fatigue||0)+'% FATIGUE</small></div>'+
+             (starter?'STARTER':'DEPTH '+(i+1))+' • '+escape(condition)+
+             ' • '+Math.round(p.fatigue||0)+'% FATIGUE'+
+             ' • '+Math.round(projected)+' GAME-DAY ESTIMATE'+
+             (fit!=null?' • SCHEME FIT '+escape(fit):'')+'</small></div>'+
              (starter?'<span class="gm-p7-pin">STARTING</span>':
-                available?btn('START','gmImmersionStarter(\''+pos+'\',\''+escape(p.id)+'\')',
-                  'gm-p7-smallbutton'):'<span class="gm-p7-unavailable">OUT</span>')+
+                available?btn('START · '+(ratingDelta>=0?'+':'')+ratingDelta+' OVR',
+                  'gmImmersionStarter('+escape(JSON.stringify(pos))+','+
+                    escape(JSON.stringify(String(p.id)))+')','gm-p7-smallbutton'):
+                  '<span class="gm-p7-unavailable">UNAVAILABLE</span>')+
              '</div>';
          }).join('')||'<p class="muted" style="padding:16px">No eligible players at this position</p>')+
          '</article>';
