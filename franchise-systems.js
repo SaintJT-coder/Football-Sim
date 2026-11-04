@@ -27,7 +27,13 @@ function fit(p,scheme){migratePlayer(p);if(!scheme)return 75;const a=p.attribute
  if(scheme==='Cover 3'||scheme==='Cover 2')score+=(a.zoneCoverage+a.awareness-140)*.08;
  return clamp(Math.round(score),0,100)}
 function init(s){s.franchiseSystems??={version:1,schemes:{},depthCharts:{},weeklyPlans:{}};for(const p of s.players||[])migratePlayer(p);return s.franchiseSystems}
-function scheme(s,t,side){const x=init(s).schemes[t]||{};return x[side]||(side==='offense'?'Balanced':'Cover 3')}
+function scheme(s,t,side){
+ // Setup migrates the roster once. Re-scanning every player for each selected
+ // starter during scoreTeam() makes multi-season simulation needlessly costly.
+ const system=s.franchiseSystems||init(s);
+ const x=system.schemes[t]||{};
+ return x[side]||(side==='offense'?'Balanced':'Cover 3');
+}
 function depth(s,t,pos){if(root.GMRosterRules)return root.GMRosterRules.depth(s,t,pos);const x=init(s),r=s.players.filter(p=>p.team===t&&p.pos===pos);const saved=x.depthCharts[t]?.[pos]||[];const rank=new Map(saved.map((id,i)=>[String(id),i]));return r.sort((a,b)=>(rank.get(String(a.id))??1e6)-(rank.get(String(b.id))??1e6)||b.rating-a.rating)}
 function setDepth(s,t,pos,ids){const r=s.players.filter(p=>p.team===t&&p.pos===pos),allowed=new Set(r.map(p=>String(p.id)));if(!POS[pos]||new Set(ids.map(String)).size!==ids.length||ids.some(id=>!allowed.has(String(id))))return false;const f=init(s);f.depthCharts[t]??={};f.depthCharts[t][pos]=ids.slice();return true}
 function effective(p,schemeName,s){migratePlayer(p);if(Number(p.injury)>0)return 0;return clamp(p.rating*(1+(root.GMCoaching?.fitModifier(p,schemeName)||0))*(1-clamp(p.fatigue,0,100)*.002)*(0.95+clamp(p.morale,0,100)*.0007)*(1+(root.GMPlayerPersonality?.performanceModifier(p)||0))+(root.GMWeeklyGameplan?.playerBoost(p,s)||0),0,99)}
