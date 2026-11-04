@@ -73,7 +73,7 @@ function depth(s,team,pos){const ps=[...members(s,team,'ACTIVE'),...members(s,te
  (order.size?(order.get(String(a.id))??999)-(order.get(String(b.id))??999):0)||
  value(b)-value(a));
 }
-function pickValue(round,slot=16){const overall=(Math.max(1,round)-1)*32+clamp(slot,1,32);return Math.round(3000*Math.pow(overall,-.64))}
+function pickValue(round,slot=16){if(root.GMDraftRealism)return root.GMDraftRealism.pickValue(round,slot);const overall=(Math.max(1,round)-1)*32+clamp(slot,1,32);return Math.round(3000*Math.pow(overall,-.64))}
 function scarcity(s,team,pos){const count=members(s,team).filter(p=>p.pos===pos&&playable(p)).length,desired={QB:2,RB:3,WR:5,TE:3,OL:5,DL:5,LB:4,CB:4,S:3,K:1}[pos]||3;return clamp(1+(desired-count)*.08,.85,1.35)}
 function tradeValue(p,s,recipient){const talent=(p.rating||60)*1.3+Math.max(0,(p.pot||p.rating)-p.rating)*.7;return Math.round(talent*POSITION_VALUE[p.pos]*scarcity(s,recipient,p.pos)*clamp(1-(p.age-26)*.016,.7,1.12))}
 function weekly(s){init(s);for(const p of s.players){if(status(p)==='PRACTICE')p.practiceSquadWeeks++;if(p.rosterStatusYear<s.year&&(status(p)==='IR'||status(p)==='PUP')){p.rosterStatus='ACTIVE';p.eligibleReturnWeek=null}}}
