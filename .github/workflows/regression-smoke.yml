@@ -1,4 +1,4 @@
-name: Gridiron GM regression smoke checks
+name: Gridiron GM regression checks
 on:
   push:
     branches: [main]
@@ -12,5 +12,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify modules and script syntax
+      - name: Check source syntax and module dependencies
+        run: node tests/source-smoke.cjs
+      - name: Install browser test dependency
+        run: npm install --no-save playwright
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run existing mobile browser regression
         run: node tests/smoke.cjs
