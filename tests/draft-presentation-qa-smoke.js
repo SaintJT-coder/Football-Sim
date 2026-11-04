@@ -38,6 +38,7 @@ const document={
  getElementById:id=>elements[id]??null
 };
 elements.app=createElement('div');
+elements.mobileSeason=createElement('div');
 let saves=0,slot='franchise-1';
 const scope={window:null,document,state,TEAMS,console,
  Math,JSON,Gridiron:{register(){}},page:'Dashboard',
@@ -46,6 +47,7 @@ const scope={window:null,document,state,TEAMS,console,
  roster:(t=state.team)=>state.players.filter(p=>p.team===t),
  capspace:()=>1000,
  save:()=>{saves++},render:()=>{},simulate:()=>{},nav:()=>{},
+ $:id=>elements[id]??createElement('div'),
  title:()=>'',metric:()=>'',heading:()=>'',xp:x=>x,
  notice:message=>{throw Error(message)},
  alert:message=>{throw Error(message)},
