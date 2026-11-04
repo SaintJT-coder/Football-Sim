@@ -39,7 +39,7 @@ function init(s){
 function snap(s,g){
  const clubs=new Set([g.a,g.b]),out=new Map();
  for(const p of s.players)if(clubs.has(p.team))
-   out.set(String(p.id),Object.fromEntries(CONFIG.record.keys.map(k=>[k,num(p.stats?.[k])])));
+   out.set(String(p.id),Object.fromEntries([...CONFIG.record.keys,'games'].map(k=>[k,num(p.stats?.[k])])));
  return out;
 }
 function story(s,kind,message,teams=[]){
@@ -94,6 +94,8 @@ function afterGame(s,g,before){
    const prev=before?.get(String(p.id))||{};
    const playerTeamKey=p.team+':'+p.id;
    const teamTotals=d.teamPlayerSeason[playerTeamKey]??={};
+   const gameCount=Math.max(0,num(p.stats?.games)-num(prev.games));
+   if(gameCount>0)p.careerStats.games=num(p.careerStats.games)+gameCount;
    for(const k of CONFIG.record.keys){
      const total=num(p.stats?.[k]),delta=Math.max(0,total-num(prev[k]));
      if(delta>0){
