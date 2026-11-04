@@ -49,6 +49,7 @@ jobs:
                           tests/save-storage-order-qa-smoke.js \
                           tests/startup-save-qa-smoke.js \
                           tests/draft-animation-qa-smoke.js \
+                          tests/draft-presentation-qa-smoke.js \
                           tests/full-page-startup-qa-smoke.js; do
             echo "::group::Running $testfile"
             node "$testfile"
