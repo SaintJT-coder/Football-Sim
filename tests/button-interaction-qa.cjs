@@ -21,7 +21,7 @@ const {chromium}=require('playwright');
    await page.locator('#gm-menu [data-action="start"]').click();
    await page.locator('#gm-menu').waitFor({state:'detached',timeout:15000});
    const tabs=await page.evaluate(()=>pages.slice());
-   const failures=[],counts={};
+   const failures=[],counts={},samples={};
    for(const tab of tabs){
      const findings=await page.evaluate(label=>{
        page=label;render();
@@ -47,6 +47,7 @@ const {chromium}=require('playwright');
        });
      },tab);
      counts[tab]=findings.length;
+     samples[tab]=findings.filter(f=>!f.disabled&&f.code).slice(0,7).map(f=>({text:f.text,code:f.code}));
      for(const f of findings){
        if(f.syntax)failures.push(tab+': invalid onclick '+JSON.stringify(f));
        if(f.missingHandler)failures.push(tab+': missing handler '+JSON.stringify(f));
@@ -66,6 +67,7 @@ const {chromium}=require('playwright');
      }catch(e){failures.push('Nav "'+tab+'": '+e.message)}
    }
    console.log('BUTTON COUNTS '+JSON.stringify(counts));
+   console.log('BUTTON SAMPLES '+JSON.stringify(samples));
    console.log('CONTROL FAILURES '+JSON.stringify(failures.slice(0,100),null,2));
    console.log('RUNTIME EXCEPTIONS '+JSON.stringify(runtime.slice(0,30)));
    if(failures.length||runtime.length)
