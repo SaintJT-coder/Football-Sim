@@ -1,6 +1,6 @@
 /* Save manager: independent slots, import/export and experimental branches. */
 (function(w){'use strict';
-const KEY='gridiron-gm-save',INDEX='gridiron-gm-save-index-v3',PREFIX='gridiron-gm-slot-v3:',CURRENT='gridiron-gm-current-slot-v3';
+const KEY='gridiron-gm-save',INDEX='gridiron-gm-save-index-v3',PREFIX='gridiron-gm-slot-v3:',CURRENT='gridiron-gm-current-slot-v3',LEGACY='gridiron-gm-slots-v2',LEGACY_DONE='gridiron-gm-v2-imported-v3';
 const read=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}};
 const clone=v=>JSON.parse(JSON.stringify(v));
 const valid=s=>!!(s&&Number.isInteger(s.year)&&s.year>=1900&&s.year<=2500&&Number.isInteger(s.week)&&s.week>=1&&s.week<=30&&Array.isArray(s.players)&&s.players.length>0&&s.players.length<=10000&&Number.isInteger(s.team)&&s.team>=0&&s.team<(w.TEAMS?.length||32));
@@ -39,6 +39,26 @@ function bootstrap(s){
  localStorage.setItem(CURRENT,info.id);
  localStorage.setItem(KEY,JSON.stringify(s));
 }
+function legacyPending(){
+ const slots=read(LEGACY),done=read(LEGACY_DONE);
+ if(!Array.isArray(slots))return [];
+ const imported=Array.isArray(done)?done:[];
+ return slots.slice(0,3).map((record,i)=>({record,i})).filter(({record,i})=>
+   valid(record?.data)&&!imported.includes(i)&&
+   !index().some(entry=>entry.id==='legacy-v2-'+(i+1)));
+}
+function importLegacySlots(){
+ const pending=legacyPending(),done=read(LEGACY_DONE);
+ const seen=Array.isArray(done)?done.slice():[],imported=[];
+ for(const {record,i} of pending){
+   const info=write(clone(record.data),'Legacy Slot '+(i+1)+' · '+
+     (w.TEAMS?.[record.data.team]?.[1]||'Franchise'),'legacy-v2-'+(i+1),null);
+   imported.push(info);
+   seen.push(i);
+   localStorage.setItem(LEGACY_DONE,JSON.stringify(seen));
+ }
+ return imported;
+}
 function compare(slotId){
  const item=index().find(x=>x.id===slotId);if(!item?.branchOf)return null;
  const parent=index().find(x=>x.id===item.branchOf);
@@ -58,7 +78,7 @@ function compare(slotId){
 function page(s){
  // Do not create a phantom franchise just because an unsaved visitor opens Load Game.
  if(index().length||valid(read(KEY)))bootstrap(s);
- const entries=index(),current=activeId();
+ const entries=index(),current=activeId(),oldSaves=legacyPending();
  const active=entries.find(e=>e.id===current),parent=entries.find(e=>e.id===active?.branchOf);
  const branches=entries.filter(e=>e.branchOf),main=entries.filter(e=>!e.branchOf);
  const actions=e=>'<div class="gm-save-actions">'+
@@ -92,6 +112,9 @@ function page(s){
    '<button onclick="gmWhatIf()">✦ CREATE NEW WHAT IF TIMELINE</button>'+
    (parent?'<button onclick="gmReturnToParent()">↶ RETURN TO ORIGINAL TIMELINE</button>':'')+
    '</div>'+
+   (oldSaves.length?'<div class="card" style="border-color:#bdab4f"><h3>LEGACY FRANCHISES FOUND</h3>'+
+     '<p>'+oldSaves.length+' old v2 franchise(s) are available. Importing creates independent v3 copies; the originals remain untouched.</p>'+
+     '<button onclick="gmImportLegacy()">IMPORT OLD SAVES</button></div>':'')+
    '<div class="card"><button class="primary" onclick="gmSaveNew()">SAVE AS NEW SLOT</button> '+
      '<button onclick="gmSaveCurrent()">SAVE CURRENT</button> '+
      '<button onclick="document.getElementById(\'gm-import-json\').click()">IMPORT JSON</button>'+
@@ -106,8 +129,19 @@ function page(s){
    (branches.length?'<div class="grid two">'+branches.map(card).join('')+'</div>':
      '<div class="card">No alternate timelines yet. Create a What If branch to explore a different outcome without replacing your main save.</div>');
 }
-const api={index,activeId,restore,bootstrap,snapshot,create,activate,branch,remove,rename,exportSave,importSave,compare,page};
+const api={index,activeId,restore,bootstrap,legacyPending,importLegacySlots,snapshot,create,activate,branch,remove,rename,exportSave,importSave,compare,page};
 w.Gridiron?.register('saves',api);w.GMSaveManager=api;
+w.gmImportLegacy=()=>{
+ const pending=legacyPending();
+ if(!pending.length)return alert('No older franchises require importing.');
+ if(!confirm('Import '+pending.length+' legacy franchise(s) into named saves? Original legacy data will be preserved.'))return;
+ try{
+   const imported=importLegacySlots();
+   if(!imported.length)return alert('No franchises imported.');
+   if(!activeId()){activate(imported[0].id);location.reload();return}
+   render();
+ }catch(e){alert('Import failed: '+e.message)}
+};
 w.gmSaveNew=()=>{const name=prompt('Name this franchise save:','My Franchise');if(!name)return;try{create(state,name);save();render()}catch(e){alert(e.message)}};
 w.gmSaveCurrent=()=>{try{if(!activeId())create(state,'Franchise');else snapshot(state);save();render()}catch(e){alert(e.message)}};
 w.gmWhatIf=()=>{const name=prompt('Name your alternate universe:','What If: '+(index().find(x=>x.id===activeId())?.name||'Franchise'));if(!name)return;try{branch(state,name);save();render()}catch(e){alert(e.message)}};
