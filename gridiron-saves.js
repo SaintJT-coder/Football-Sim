@@ -93,7 +93,7 @@ function compare(slotId){
    const recent=(s.results||[]).filter(g=>g.year===s.year&&(g.a===s.team||g.b===s.team));
    const wins=recent.filter(g=>(g.sa>g.sb?g.a:g.b)===s.team).length;
    const active=s.players.filter(p=>p.team===s.team);
-   const overall=active.length?Math.round(active.reduce((sum,p)=>sum+(p.rating||0),0)/active.length):0;
+   const overall=active.length?Math.round(active.reduce((sum,p)=>sum+(p.rating||0),0)/active.length*10)/10:0;
    const injured=active.filter(p=>Number(p.injury||0)>0).length;
    const titles=(s.history||[]).filter(h=>h.year<=s.year&&h.champ===w.TEAMS?.[s.team]?.[1]).length;
    const championships=(s.leagueNarratives?.champions||[]).filter(h=>h.team===s.team).length;
