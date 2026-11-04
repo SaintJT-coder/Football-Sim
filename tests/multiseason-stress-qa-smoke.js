@@ -51,7 +51,12 @@ for(const filename of modules){
  new vm.Script(code,{filename}).runInContext(context,{timeout:10000});
 }
 
-scope.save=()=>{scope.GMLeaguePlayerLifecycle?.prune(state);scope.GMSaveRetention?.compact(state)};
+let peakSaveBytes=0;
+scope.save=()=>{
+ scope.GMLeaguePlayerLifecycle?.prune(state);
+ scope.GMSaveRetention?.compact(state);
+ peakSaveBytes=Math.max(peakSaveBytes,Buffer.byteLength(JSON.stringify(state),'utf8'));
+};
 const seasons=5,metrics=[];
 for(let season=0;season<seasons;season++){
  const year=2026+season;
@@ -94,6 +99,7 @@ for(let season=0;season<seasons;season++){
    freeAgents=state.players.filter(p=>p.team===-1).length,
    bytes=Buffer.byteLength(JSON.stringify(state),'utf8');
  const row={year,games:games.length,draftPicks,active,freeAgents,inactiveRetired,
+   peakSaveMiB:+(peakSaveBytes/1048576).toFixed(2),
    totalPlayers:state.players.length,preOffseasonMiB:+(preSeasonSize/1048576).toFixed(2),
    savedMiB:+(bytes/1048576).toFixed(2),salaryCap:cap};
  metrics.push(row);
@@ -117,7 +123,10 @@ for(let season=0;season<seasons;season++){
  assert.ok(active>0,'User has no contracted players');
  assert.ok(freeAgents<=scope.GMLeaguePlayerLifecycle.CONFIG.activeFreeAgents,
    'Free-agent supply grew beyond market cap');
- assert.ok(bytes<5*1024*1024,'Save exceeds 5 MiB safety budget');
+ assert.ok(bytes<5*1024*1024,'Postseason save exceeds 5 MiB safety budget');
+ assert.ok(peakSaveBytes<5*1024*1024,
+   'An intermediate weekly save exceeded the 5 MiB safety budget');
+ peakSaveBytes=0;
 }
 assert.equal(state.seasonRecaps.length,seasons);
 assert.equal(state.leagueNarratives.honors.length,seasons);
