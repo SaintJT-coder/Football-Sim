@@ -66,6 +66,12 @@ for(const team of Array.from({length:32},(_,i)=>i)){
  assert.equal(receiving,pass,'Missing receiving touchdowns for team '+team);
 }
 assert.equal(state.immersionPress.active.questions.length,3);
+// Small touchdown totals must never produce negative stats after rounding.
+for(const player of state.players){
+ for(const field of ['rushTD','recTD','passTD','receptions','receivingYards','rushYards']){
+   assert.ok((player.stats[field]||0)>=0,'Negative '+field+' for '+player.name);
+ }
+}
 assert.equal(state.leagueNarratives.processedGames.length,16);
 assert.ok(Object.keys(state.leagueNarratives.careerRecords).length>0);
 const conference=state.immersionPress.active;
