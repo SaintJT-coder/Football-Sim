@@ -115,7 +115,10 @@ const {chromium}=require('playwright');
    await page.locator('#gm-menu').waitFor({state:'detached'});
    const alphaButton=page.locator('#app button[onclick="gmLoadSlot(\''+initial.slot+'\')"]');
    await alphaButton.click();
-   await page.locator('#gm-menu').waitFor({state:'visible'});
+   // Loading a slot navigates/reloads the app; it does not guarantee the main menu is open.
+   // Wait for the selected save to be restored rather than a particular overlay state.
+   await page.waitForFunction(id=>typeof state!=='undefined'&&
+     state.team===0&&window.GMSaveManager?.activeId()===id,initial.slot,{timeout:30000});
    const loaded=await page.evaluate(()=>({
      team:state.team,year:state.year,week:state.week,results:state.results.length,
      slot:GMSaveManager.activeId()
