@@ -29,7 +29,7 @@ function selectProspect(p,pick,persist=true){const f=init();if(!p||p.drafted||!p
  // Stable IDs must never be reused after a player retires or leaves the
  // active pool; retired career records and award snapshots still refer to them.
  if(!Number.isSafeInteger(state.nextPlayerId)||state.nextPlayerId<1){
-   const ids=[...state.players,...(state.retired||[])];
+   const ids=[...state.players,...(state.retired||[]),...(state.departedPlayers||[])];
    state.nextPlayerId=ids.reduce((max,x)=>Math.max(max,Number(x.id)||0),0)+1;
  }
  const newId=state.nextPlayerId++;
