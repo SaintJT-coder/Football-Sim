@@ -304,10 +304,15 @@ function historyPage(s){
      '<p class="muted">All-Pro selections: '+(honors?.allPro?.length||0)+
      ' · Pro Bowl selections: '+(honors?.proBowlByConference||[]).reduce((n,c)=>n+(c.players?.length||0),0)+'</p></div>';
  }).join('');
- const dynasty=Object.entries(d.champions.reduce((counts,c)=>{
-   const key=c.team+':'+c.teamName;
-   counts[key]=(counts[key]||0)+1;return counts;
- },{})).sort((a,b)=>b[1]-a[1]);
+ // Group dynasties by stable team ID so relocation/name changes don't
+ // split one franchise's historical championship total into multiple clubs.
+ const byTeam={};
+ for(const c of d.champions){
+   const key=String(c.team);
+   byTeam[key]??={name:c.teamName||club(c.team),count:0};
+   byTeam[key].count++;
+ }
+ const dynasty=Object.values(byTeam).sort((a,b)=>b.count-a.count);
  const marked=Object.values(d.teamRecords).sort((a,b)=>b.year-a.year);
  return '<div class="eyebrow">GRIDIRON ARCHIVES</div><h1 class="heading">LEAGUE HISTORY</h1>'+
    '<p class="sub">Championships, annual honors, record seasons, and growing franchise dynasties.</p>'+
@@ -317,8 +322,8 @@ function historyPage(s){
    '<h2>CHAMPIONSHIP & AWARD YEARBOOK</h2>'+
    (rows||'<div class="card">Complete a season to start your league history.</div>')+
    '<h2>DYNASTIES</h2><div class="card">'+
-   (dynasty.map(([key,value])=>'<p><b>'+esc(key.slice(key.indexOf(':')+1))+
-     '</b> · '+value+' championship'+(value===1?'':'s')+'</p>').join('')||
+   (dynasty.map(c=>'<p><b>'+esc(c.name)+
+     '</b> · '+c.count+' championship'+(c.count===1?'':'s')+'</p>').join('')||
      'Dynasties begin with the first championship.')+'</div>'+
    '<h2>TEAM RECORD BOOK</h2><div class="grid two">'+
    (marked.map(r=>'<div class="card"><h3>'+esc(r.kind)+'</h3><b>'+r.value+
