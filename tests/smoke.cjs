@@ -59,6 +59,29 @@ const {chromium}=require('playwright');
    await overlay.getByRole('button',{name:/CONTINUE DRAFT/}).click();
    await overlay.waitFor({state:'detached'});
 
+   // Championship celebration must open as a keyboard-accessible dialog,
+   // expose the champion and season, and close with Escape without trapping UI.
+   await page.evaluate(()=>window.launchChampionshipCelebration('QA Sentinels',2030));
+   const celebration=page.locator('#champ-overlay');
+   await celebration.waitFor({state:'visible'});
+   if(await celebration.getAttribute('role')!=='dialog' ||
+      await celebration.getAttribute('aria-modal')!=='true')
+     throw Error('Championship celebration is missing accessible dialog semantics');
+   if(!(await celebration.innerText()).includes('QA SENTINELS')||
+      !(await celebration.innerText()).includes('2030'))
+     throw Error('Championship celebration did not show the champion and season');
+   await page.waitForFunction(()=>document.activeElement?.classList?.contains('champ-btn'));
+   await page.keyboard.press('Escape');
+   await celebration.waitFor({state:'detached',timeout:3000});
+   if(await page.locator('#champ-overlay').count())
+     throw Error('Escape did not release championship celebration');
+   // Reduced-motion users must not be forced through confetti animation.
+   const hasReducedMotionRule=await page.evaluate(()=>[...document.styleSheets].some(sheet=>{
+     try{return [...sheet.cssRules].some(rule=>rule.conditionText?.includes('prefers-reduced-motion'))}
+     catch{return false}
+   }));
+   if(!hasReducedMotionRule)throw Error('Missing championship reduced-motion styles');
+
    // The simulation now plays sixteen games per week across 32 teams.
    await page.evaluate(()=>{page='Dashboard';render()});
    const before=await page.evaluate(()=>({week:state.week,results:state.results.length}));
