@@ -38,6 +38,7 @@ function simulate(input, rng=random(input.seed)) {
   const wet=['Rain','Snow'].includes(input.weather), wind=input.weather==='Wind';
   const opening=rng()<.5?0:1;
   let offense=opening, spot=30, down=1, need=10, period=1, clock=cfg.quarter;
+  let playLabel='';
   let timeouts=[3,3], drive, pending, overtimeSeries=0, finished=false;
   const remaining=()=>period>4?clock:(4-period)*cfg.quarter+clock;
   function stats(p) {
@@ -154,10 +155,10 @@ function simulate(input, rng=random(input.seed)) {
     const kickNow=period<=4&&period%2===0&&clock<=8&&distance<=range&&!needsTD;
     const go=needsTD||(need<=2&&spot>=47&&(plan.redZone==='Aggressive'||rng()<.48));
     if(kickNow||(down===4&&!go)){
-      kick(distance>range);return 7;
+      playLabel=distance>range?'Punt':'Field goal';kick(distance>range);return 7;
     }
     if(period===4&&margin>0&&clock<=36*(4-down)&&timeouts[other]===0){
-      const qb=select(side,'QB');expose(qb,0);credit(qb,'rushYards',-1);credit(qb,'yards',-1);
+      playLabel='Kneel';const qb=select(side,'QB');expose(qb,0);credit(qb,'rushYards',-1);credit(qb,'yards',-1);
       line.plays++;drive.plays++;line.rushYards--;spot--;need++;down++;
       if(spot<=0){mark(other,2,'Safety');finishPossession('Safety',other,null);}
       else if(down>4)finishPossession('Turnover on downs',other,100-spot);
@@ -213,6 +214,8 @@ function simulate(input, rng=random(input.seed)) {
     if(contact&&spot>0&&spot<100&&rng()<cfg.contactFumble*(wet?1.45:1)){
       turnover=true;credit(handler,'lostFumbles');
     }
+    playLabel=turnover?'Turnover':sacked?'Sack':incomplete?'Incomplete pass':passing?'Completion':'Run';
+    playLabel+=' ('+(gain>0?'+':'')+gain+' yd)';
     const stopped=incomplete||turnover||spot>=100||spot<=0;
     let elapsed=stopped?6:Math.round((urgent?cfg.hurryRunoff:cfg.averageRunoff)-plan.tempo+rng()*8);
     if(!stopped&&urgent&&clock<50&&timeouts[side]>0){timeouts[side]--;elapsed=7;}
@@ -231,7 +234,12 @@ function simulate(input, rng=random(input.seed)) {
   kickoff(opening);
   for(let actions=0;!finished;actions++){
     if(actions>900)throw Error('Game clock did not resolve');
+    const entry=input.onPlay?{period,clock,team:sides[offense].id,down,need,spot}:null;
+    const prior=drives.length;
     clock=Math.max(0,clock-snap());
+    if(entry){entry.description=playLabel+(drives.length>prior?' · '+drives[prior].outcome:'');
+      entry.home=score[0];entry.away=score[1];input.onPlay(entry);
+    }
     if(finished)break;
     if(clock===0){
       if(period===4&&score[0]!==score[1])break;

@@ -70,7 +70,7 @@ function upgradeLeague(s){
  s.cap=Math.max(350,s.cap||0);if(s.engine){s.engine.season=0;s.engine.schedule=[]}
  return s;
 }
-function enter(s,i){s=upgradeLeague(s);if(melodyTimer){clearInterval(melodyTimer);melodyTimer=null}if(!valid(s))return alert('This save is invalid.');state=s;if(Number.isInteger(i))state.menuSlot=i;window.GMSaveManager?.snapshot(state);if(window.GMSaveManager?.writeMirror)window.GMSaveManager.writeMirror(state);else localStorage.setItem(ACTIVE,JSON.stringify(state));$('gm-menu')?.remove();render()}
+function enter(s,i){s=upgradeLeague(window.GMFranchiseRules?.load(s,fresh)??s);if(melodyTimer){clearInterval(melodyTimer);melodyTimer=null}if(!valid(s))return alert('This save is invalid.');state=s;if(Number.isInteger(i))state.menuSlot=i;window.GMSaveManager?.snapshot(state);if(window.GMSaveManager?.writeMirror)window.GMSaveManager.writeMirror(state);else localStorage.setItem(ACTIVE,JSON.stringify(state));$('gm-menu')?.remove();render()}
 function create(){
  const saveName=($('gm-franchise-name')?.value||'').trim().slice(0,80)||team(chosen)+' Franchise';
  const s=fresh();s.team=chosen;

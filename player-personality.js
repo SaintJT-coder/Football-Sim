@@ -89,7 +89,7 @@ function factors(p,s){
  return {xp,morale,holdout,fit,philosophy};
 }
 function xpMultiplier(p,s){return factors(p,s).xp}
-function holdoutMultiplier(p,s){return factors(p,s).holdout}
+function holdoutMultiplier(p,s){return factors(p,s).holdout*((p.morale??65)<40?1.2:1)}
 function style(p){const d=ensure(p);return d?CONFIG.styles[p.pos].find(x=>x[0]===d.playStyle):null}
 function ratingModifier(p){return style(p)?.[2]||0}
 function performanceModifier(p,phase){const x=style(p);return x&&(!phase||phase===x[1])?x[3]:0}
@@ -181,6 +181,7 @@ function midseason(s,random=Math.random){
 function page(s){
  const players=s.players.filter(p=>p.team===s.team),events=(s.playerProgressionEvents||[]).filter(e=>e.team===s.team).slice(0,8);
  return '<div class="eyebrow">PLAYER IDENTITY & PROGRESSION</div><h1 class="heading">LOCKER ROOM</h1>'+
+   '<p>Team chemistry: '+Math.round(s.players.filter(p=>p.team===s.team).reduce((v,p)=>v+(p.morale??65),0)/Math.max(1,s.players.filter(p=>p.team===s.team).length))+' / 100</p>'+
    '<p class="sub">Personality shapes XP, morale and holdouts. Styles give a 0.9–1.5% attribute OVR modifier and up to 1.8% performance bonus.</p>'+
    '<div class="card"><h3>RECENT BREAKOUTS & REGRESSIONS</h3>'+
    (events.map(e=>'<p>'+esc(e.name)+' · '+esc(e.type)+' · '+(e.change>0?'+':'')+e.change+' OVR · W'+e.week+'</p>').join('')||'<p>No events recorded yet.</p>')+'</div>'+
@@ -191,7 +192,7 @@ function page(s){
        '<p>'+d.traits.map(t=>'<span class="pill">'+esc(t)+'</span>').join(' ')+'</p>'+
        '<p>Scheme fit '+Math.round(f.fit)+' · XP ×'+f.xp.toFixed(2)+
        ' · Holdout risk ×'+f.holdout.toFixed(2)+'</p>'+
-       '<p>Last game '+(sn.last?.count||0)+' snaps · Season '+sn.season+' snaps</p></div>';
+       '<p>Morale '+Math.round(p.morale??65)+' / 100 · Last game '+(sn.last?.count||0)+' snaps · Season '+sn.season+' snaps</p></div>';
    }).join('')+'</div>';
 }
 const api={CONFIG,ensure,schemeFit,factors,xpMultiplier,holdoutMultiplier,style,

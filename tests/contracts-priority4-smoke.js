@@ -31,6 +31,12 @@ const loyalty={...p,agent:{persona:'Loyalty-Focused',name:'Agent B'}};
 const offer={years:3,salary:25,bonus:6,guaranteed:10,clauses:{}};
 assert.ok(E.evaluateOffer(moneyFirst,state,offer).required>E.evaluateOffer(loyalty,state,offer).required);
 
+// Release that accelerates more guaranteed money than the available room must be atomic.
+const pressure=JSON.parse(JSON.stringify(state)), expensive=pressure.players.find(x=>x.team===0);
+const locked=A.init(expensive,pressure);
+locked.guarantees=[0,500];const capBefore=E.sheet(pressure).space;
+assert.equal(E.release(expensive,pressure).ok,false);
+assert.equal(expensive.team,0);assert.equal(E.sheet(pressure).space,capBefore);
 const startCash=state.cash;
 const invalid=E.extend(p,state,{years:9,salary:25,bonus:6});
 assert.equal(invalid.ok,false);

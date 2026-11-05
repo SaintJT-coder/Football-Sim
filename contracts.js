@@ -37,7 +37,7 @@ window.faAdvance=function(){
    if(!p)continue;
    const offer=pending[p.id]||{};
    p.contract={...offer,signedYear:state.year};
-   window.GMContractEconomy?.registerSigning(p,state,offer);
+   // Free agency books the complete contract before the next bid resolves.
    display={...signing,guaranteed:offer.guaranteed||0,incentive:offer.incentive||0,
       clause:offer.clause||'NONE',agent:offer.agent||agent(p)};
  }

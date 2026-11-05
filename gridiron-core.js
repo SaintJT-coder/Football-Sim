@@ -9,4 +9,5 @@ Gridiron.getState=()=>typeof state!=='undefined'?state:null;
 Gridiron.clone=value=>JSON.parse(JSON.stringify(value));
 Gridiron.version='2.0';
 w.Gridiron=Gridiron;
+if(w.GMFranchiseRules)Gridiron.register('franchiseRules',w.GMFranchiseRules);
 })(window);

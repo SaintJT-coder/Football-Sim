@@ -10,7 +10,7 @@ function init(){
  state.frontOffice??={season:state.year,prospects:[],picks:[],scouted:{},draftLog:[],tradeLog:[],offers:[],selectedOut:[],selectedIn:[],counter:null,round:1,clock:0,boardFilter:'ALL',tradeTab:'Players',draftStarted:false};
  const f=state.frontOffice;
  if(f.season!==state.year){f.season=state.year;f.prospects=[];f.picks=[];f.scouted={};f.draftLog=[];f.offers=[];f.selectedOut=[];f.selectedIn=[];f.round=1;f.clock=0;f.draftStarted=false}
- if(!f.picks.length&&!f.draftStarted){for(let round=1;round<=7;round++)for(let slot=1;slot<=TEAMS.length;slot++)f.picks.push({id:state.year+'-'+round+'-'+slot,round,slot,owner:slot-1,original:slot-1,used:false})}
+ if(!f.picks.length&&!f.draftStarted){for(let round=1;round<=7;round++)for(let slot=1;slot<=TEAMS.length;slot++)f.picks.push({id:state.year+'-'+round+'-'+slot,round,slot,owner:state.engine?.nextDraftOrder?.[slot-1]??slot-1,original:state.engine?.nextDraftOrder?.[slot-1]??slot-1,used:false})}
  // Migrate legacy 130-player classes even after draft night has started;
  // generate only once per class to keep mobile re-renders inexpensive.
  if(window.GMDraftRealism&&(f.realismReadyYear!==state.year||
@@ -40,18 +40,43 @@ function selectProspect(p,pick,persist=true){const f=init();if(!p||p.drafted||!p
  }
  const newId=state.nextPlayerId++;
  const salary=+(Math.max(.7,5.2-pick.round*.57-pick.slot*.035)).toFixed(2);
+ const draftRoom=window.GMContractEconomy?.sheet(state,pick.owner).space??(state.cap-roster(pick.owner).reduce((sum,p)=>sum+(p.salary||0),0));
  state.players.push({id:newId,name:p.name,pos:p.pos,age:p.age,rating:p.rating,pot:p.pot,salary,team:pick.owner,stats:{yards:0,td:0,tackles:0,sacks:0},injury:0,years:4,target:false,fatigue:0,morale:70,development:0,rookie:true,devTrait:p.dev});
  const rookie=state.players[state.players.length-1];
  if(p.draftRealism?.trueAttributes)rookie.attributes={...p.draftRealism.trueAttributes};
  if(window.GMDraftRealism)GMDraftRealism.rookieContract(rookie,state,pick.round,pick.slot);
  else window.GMDraftAdvanced?.draft(rookie,state,pick.round,pick.slot);
+ if(window.GMFranchiseRules&&!GMFranchiseRules.canAfford(draftRoom,window.GMContractsAdvanced?.capHit(rookie,state.year,state)??rookie.salary)){
+   // Retain draft rights off the active payroll until there is space.
+   state.players.pop();(f.unsigned??=[]).push(rookie);
+ }
  f.draftLog.push({pick:pick.id,team:pick.owner,player:p.name,prospectId:p.id,pos:p.pos,overall:p.rating,round:pick.round,slot:pick.slot});
  state.news.unshift('Draft: '+TEAMS[pick.owner][1]+' selected '+p.name+' ('+p.pos+')');
  if(persist)save();return true}
 function draftProspect(id){const f=init(),pick=currentPick();if(!pick)return notice('Draft complete');if(pick.owner!==state.team)return notice('AI team is on the clock. Advance to your pick.');let p=f.prospects.find(x=>x.id===id);if(!p||p.drafted)return;selectProspect(p,pick);render()}
 function advanceDraft(){let f=init(),pick=currentPick();if(!pick)return notice('Draft complete');let count=0;while((pick=currentPick())&&pick.owner!==state.team&&count<f.picks.length){aiDraft(pick);count++}save();render()}
 function autoDraft(){let f=init(),count=0;while(currentPick()&&count<f.picks.length){aiDraft(currentPick());count++}save();render()}
-function draftPage(){let f=init(),pick=currentPick(),left=f.prospects.filter(p=>!p.drafted),mine=f.picks.filter(p=>p.owner===state.team&&!p.used);return title('NFL-Style Rookie Draft','Seven rounds · '+TEAMS.length+' fictional clubs · '+f.picks.length+' picks · hidden prospect ratings','DRAFT WAR ROOM')
+function rightsCharge(rookie){
+ const contract=rookie.contractAdvanced;
+ return contract?Math.round(100*((contract.baseSalaries?.[0]||0)+(contract.bonusProration?.[0]||0)))/100:rookie.salary;
+}
+function signRightsIfAffordable(f,rookie){
+ const room=window.GMContractEconomy?.sheet(state,rookie.team).space??(state.cap-roster(rookie.team).reduce((sum,p)=>sum+(p.salary||0),0));
+ if(!GMFranchiseRules.canAfford(room,rightsCharge(rookie)))return false;
+ if(rookie.contractAdvanced)rookie.contractAdvanced.startYear=state.year;
+ state.players.push(rookie);f.unsigned=f.unsigned.filter(p=>p!==rookie);return true;
+}
+window.Gridiron?.on?.('week:games-complete',()=>{
+ const f=state.frontOffice;if(!f?.unsigned?.length)return;
+ for(const rookie of [...f.unsigned])if(rookie.team!==state.team)signRightsIfAffordable(f,rookie);
+});
+window.signDraftRights=id=>{
+ const f=init(),rookie=(f.unsigned||[]).find(p=>p.id===id&&p.team===state.team);
+ if(!rookie)return;
+ if(!signRightsIfAffordable(f,rookie))return notice('Free cap space before signing this pick');
+ save();render();
+};
+function draftPage(){let f=init(),pick=currentPick(),left=f.prospects.filter(p=>!p.drafted),mine=f.picks.filter(p=>p.owner===state.team&&!p.used);return title('NFL-Style Rookie Draft','Seven rounds · '+TEAMS.length+' fictional clubs · '+f.picks.length+' picks · hidden prospect ratings','DRAFT WAR ROOM')+(f.unsigned||[]).filter(p=>p.team===state.team).map(p=>'<button onclick="signDraftRights('+p.id+')">Sign drafted '+xp(p.name)+' · '+cash(p.salary)+'</button>').join('')
  +'<div class="grid three">'+metric('On the clock',pick?TEAMS[pick.owner][0]:'Draft complete')+metric('Overall pick',pick?(pick.round-1)*TEAMS.length+pick.slot:'—')+metric('My remaining picks',mine.length)+metric('Scouting points',state.upgrades.scoutPoints??20)+metric('Prospects available',left.length)+metric('Round',pick?.round||7)+'</div>'
  +'<div class="card" style="margin:16px 0"><h3>Draft controls</h3><button class="primary" onclick="advanceDraft()">Advance to My Pick</button> <button onclick="autoDraft()" >Simulate Remaining Draft</button><p class="muted small">Drafting commits a four-year rookie contract. Scouting reveals ratings in stages. AI selects by talent and roster needs.</p></div>'
  +'<div class="filters">'+['ALL',...allPos].map(pos=>'<button class="'+(f.boardFilter===pos?'selected':'')+'" onclick="state.frontOffice.boardFilter=\''+pos+'\';render()">'+pos+'</button>').join('')+'</div>'

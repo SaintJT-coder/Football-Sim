@@ -5,7 +5,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const modules=[
- 'gridiron-core.js','franchise-systems.js','player-development.js',
+ 'franchise-rules.js','gridiron-core.js','franchise-systems.js','player-development.js',
  'coaching-philosophy.js','coaching-staff.js','player-personality.js',
  'roster-rules.js','weekly-gameplan.js','owner-franchise.js',
  'injury-medical.js','season-recap.js','draft-scouting-advanced.js',
@@ -90,7 +90,12 @@ assert.equal(state.seasonRecaps[0].year,2026);
 assert.ok(state.seasonRecaps[0].yearInReview);
 assert.equal(state.contractEconomy.processed.includes(2026),true);
 assert.equal(state.leagueNarratives.honors[0].year,2026);
-assert.ok(state.engine.playoffs.length>0);
+assert.equal(state.engine.playoffs.length,11);
+assert.equal(new Set(state.engine.playoffs.flatMap(g=>[g.a,g.b])).size,12);
+assert.equal(state.engine.playoffs.filter(g=>g.round==='Wild Card').length,4);
+assert.equal(state.engine.playoffs.at(-1).round,'Super Bowl');
+assert.equal(state.seasonRecaps[0].playoffs.length,11);
+assert.equal(state.history.at(-1).champ,TEAMS[state.engine.playoffs.at(-1).winner][1]);
 scope.simulate();
 assert.equal(state.week,2);
 assert.equal(state.results.filter(g=>g.year===2027).length,16);

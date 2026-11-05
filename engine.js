@@ -11,18 +11,7 @@ const scoreTeam=(team)=>{ if(window.GMFranchise){const x=GMFranchise.score(state
  const spec=unit([['K',1]]);
  return {off:off||58,def:def||58,spec:spec||60};
 };
-const freshSchedule=()=>{
- const teams=Array.from({length:TEAMS.length},(_,i)=>i),schedule=[];
- for(let round=0;round<17;round++){
-  const week=round===8?18:round+1;
-  for(let i=0;i<16;i++){
-   const a=teams[i],b=teams[31-i];
-   schedule.push({a:round%2?b:a,b:round%2?a:b,week});
-  }
-  teams.splice(1,0,teams.pop());
- }
- return schedule;
-};
+const freshSchedule=()=>GMFranchiseRules.schedule(TEAMS.length);
 function setup(){
  window.GMFranchise?.init(state);
  state.engine??={version:2,season:state.year,schedule:freshSchedule(),career:{},awards:[],playoffs:[],log:[]};
@@ -60,9 +49,9 @@ function buildSide(team,g,rng,home,round){
      const role=pos==='QB'?'pass':pos==='RB'?'run':['TE','WR'].includes(pos)?'receive':'defense';
      const personality=window.GMPlayerPersonality?.performanceModifier(p,role)||0;
      const ability=window.GMDevelopment?.abilityBoost(p,{playType:role,scheme})||0;
-     depth[pos].push({id:p.id,rating:p.rating*(1+personality+ability)+(window.GMWeeklyGameplan?.playerBoost(p,state)||0),
+     depth[pos].push({id:p.id,rating:p.rating*(1+personality+ability)+GMFranchiseRules.moraleRating(p.morale)+(window.GMWeeklyGameplan?.playerBoost(p,state)||0),
        accuracy:p.attributes?.kickAccuracy,power:p.attributes?.kickPower,fatigue:p.fatigue,wear:p.medical?.wear||0,limited:clearance!=='FULL',
-       conditioning:window.GMStaff?.conditioning(p,state)?.injuryMultiplier??1,
+       conditioning:(window.GMStaff?.conditioning(p,state)?.injuryMultiplier??1)*(p.morale>75?.93:1),
        returnRisk:(p.medical?.returnWeeks||p.medical?.active)?1+(p.medical.active?.risk??.22)*(1.8-(medical-50)/65):1});
    }
  }
@@ -71,7 +60,7 @@ function buildSide(team,g,rng,home,round){
  const venue=home?(round?sim.playoffHome:sim.home)+(own?(window.GMOwner?.modifiers(state).homeField||0):0):0;
  const stable=round==='Super Bowl'||round==='Conference Final';
  const rivalry=window.GMSimPresentation?.pregameBoost(state,g,team)||0;
- return {id:team,depth,passRate:(coach?.passShare??sim.passRate)+(scheme==='Air Raid'?.10:scheme==='Power Run'?-.10:0)+
+ return {id:team,depth,passRate:(coach?.passShare??sim.passRate)+(own?(state.weeklyOperations?.plan?.offense==='Aggressive'?.06:state.weeklyOperations?.plan?.offense==='Conservative'?-.06:0):0)+(scheme==='Air Raid'?.10:scheme==='Power Run'?-.10:0)+
     (plan.offense==='PASS HEAVY'?.10:plan.offense==='RUN HEAVY'?-.10:0),
    redZone:coach?.redZone||'Balanced',blitz:coach?.blitz??35,tempo:(coach?.tempo||0)+(plan.tempo==='AGGRESSIVE'?3:plan.tempo==='CONSERVATIVE'?-3:0),
    attack:staff('offense')+(weekly.offense||0)+(coach?.offSynergy||0)*.3+rivalry*50,
@@ -82,13 +71,21 @@ function game(g,round=null){
  const sim=Gridiron.possessionSim,seed=Math.floor(Math.random()*4294967296),rng=sim.random(seed);
  const weather=sim.CONFIG.weather[Math.floor(rng()*sim.CONFIG.weather.length)];
  const teams=[buildSide(g.a,g,rng,round!=='Super Bowl',round),buildSide(g.b,g,rng,false,round)];
- const result=sim.simulate({teams,weather,seed},rng);
+ const own=g.a===state.team||g.b===state.team;
+ const log=[];
+ const onPlay=own?play=>{
+   log.push(play);Gridiron.emit('game:play',{game:g,play});
+ }:null;
+ const result=sim.simulate({teams,weather,seed,onPlay},rng);
+ if(own)state.engine.lastPlayLog={year:state.year,week:g.week,a:g.a,b:g.b,round,plays:log};
  const [sa,sb]=result.score;
  Object.assign(g,{year:state.year,sa,sb});
  const injuries=new Set(result.injuries),keyInjuries=[];
  const rows=state.players.filter(p=>p.team===g.a||p.team===g.b);
  for(const p of rows){
-   const row=result.deltas.get(p.id);if(!row)continue;
+   const row=result.deltas.get(p.id);
+   if(!p.injury&&p.rosterStatus!=='PRACTICE')p.morale=GMFranchiseRules.mood(p,row?.snaps||0,(sa>sb?g.a:g.b)===p.team,Math.max(1,(p.rating-60)*.48));
+   if(!row)continue;
    if(round){
      const archive=state.engine.postseasonStats??={};
      const record=archive[p.id]??={games:0};
@@ -100,7 +97,6 @@ function game(g,round=null){
    p.medical??={active:null,chronicRisk:0,longTermLoss:0};
    p.medical.wear=Math.min(100,Math.round((p.medical.wear||0)+row.snaps*SIM_CONFIG.wearPerSnap+row.contacts*SIM_CONFIG.wearPerContact));
    p.fatigue=clamp((p.fatigue||0)+Math.round(row.snaps*SIM_CONFIG.fatiguePerSnap+row.contacts*.18),0,100);
-   p.morale=clamp((p.morale??65)+((sa>sb?g.a:g.b)===p.team?1:-1),15,100);
    if(injuries.has(p.id)){
      if(p.medical.active){p.medical.active.weeks+=1;p.medical.active.playThrough=false;p.injury=p.medical.active.weeks;}
      else if(window.GMInjuries)GMInjuries.randomInjury(p,state);
@@ -158,23 +154,18 @@ function simulateV2(){
 }
 function endSeasonV2(){
  setup();
- const standings=TEAMS.map((t,i)=>({i,rec:record(i),power:scoreTeam(i)}))
- .sort((a,b)=>b.rec.w-a.rec.w||((b.power.off+b.power.def)-(a.power.off+a.power.def)));
+ const games=state.results.filter(g=>g.year===state.year);
+ const rows=GMFranchiseRules.standings(TEAMS,games);
+ const standings=GMFranchiseRules.rank(rows,games).map(r=>({i:r.i,rec:r}));
+ state.engine.nextDraftOrder=GMFranchiseRules.draftOrder(rows,games);
  const playoffs=[];
  state.engine.postseasonStats={};
  const conferences=[...new Set(TEAMS.map(t=>t[2].split(' ')[0]))];
- const seeded=conferences.map(conf=>{
-   if(window.GMPlayoffSeeds)return GMPlayoffSeeds(conf).slice(0,7);
-   const clubs=standings.filter(x=>TEAMS[x.i][2].split(' ')[0]===conf);
-   const divisions=[...new Set(clubs.map(x=>TEAMS[x.i][2]))];
-   const winners=divisions.map(d=>clubs.filter(x=>TEAMS[x.i][2]===d)[0]).filter(Boolean);
-   const ordered=(xs)=>xs.sort((a,b)=>b.rec.w-a.rec.w||((b.power.off+b.power.def)-(a.power.off+a.power.def)));
-   return [...ordered(winners),...ordered(clubs.filter(x=>!winners.includes(x)))].slice(0,7).map((x,i)=>({...x,seed:i+1}));
- });
+ const seeded=conferences.map(conf=>GMFranchiseRules.seeds(rows,games,conf).slice(0,6));
  function playoffGame(a,b,round,conf){
    if(round!=='Super Bowl'&&a.seed>b.seed)[a,b]=[b,a];
    for(const club of [a,b]){
-     const bye=round==='Divisional'&&club.seed===1;
+     const bye=round==='Divisional'&&club.seed<=2;
      const extra=round==='Super Bowl'||bye;
      const restWeeks=extra?2:1;
      for(let week=0;week<restWeeks;week++)window.GMInjuries?.weekly(state,club.i);
@@ -188,9 +179,9 @@ function endSeasonV2(){
  }
  const finalists=seeded.map((clubs,i)=>{
    const conf=conferences[i];
-   const wild=[playoffGame(clubs[1],clubs[6],'Wild Card',conf),playoffGame(clubs[2],clubs[5],'Wild Card',conf),playoffGame(clubs[3],clubs[4],'Wild Card',conf)];
+   const wild=[playoffGame(clubs[2],clubs[5],'Wild Card',conf),playoffGame(clubs[3],clubs[4],'Wild Card',conf)];
    wild.sort((a,b)=>b.seed-a.seed);
-   const divisional=[playoffGame(clubs[0],wild[0],'Divisional',conf),playoffGame(wild[1],wild[2],'Divisional',conf)];
+   const divisional=[playoffGame(clubs[0],wild[0],'Divisional',conf),playoffGame(clubs[1],wild[1],'Divisional',conf)];
    return playoffGame(divisional[0],divisional[1],'Conference Final',conf);
  });
  const champion=playoffGame(finalists[0],finalists[1],'Super Bowl','League');
@@ -204,7 +195,7 @@ function endSeasonV2(){
  state.awards.push({year:state.year,mvp:leagueHonors?.mvp?.name||legacyMVP?.name||'—',
   offense:leagueHonors?.offense?.name||'—',defense:leagueHonors?.defense?.name||'—',
   rookie:leagueHonors?.rookie?.name||'—'});
- window.GMOwner?.seasonEnd(state,{champion:champ===state.team,playoffs:playoffs.some(g=>g.a===state.team||g.b===state.team),division:seeded.some(c=>c[0]?.i===state.team)});
+ window.GMOwner?.seasonEnd(state,{champion:champ===state.team,playoffs:playoffs.some(g=>g.a===state.team||g.b===state.team),division:seeded.some(c=>c.some(t=>t.divisionWinner&&t.i===state.team))});
  window.GMStaff?.seasonEnd(state);
  window.GMSeasonRecap?.generate(state,standings,playoffs,state.awards);
  window.Gridiron?.emit('season:complete',{state,year:state.year,champion:champ,playoffs});
@@ -216,7 +207,7 @@ function endSeasonV2(){
  for(const p of state.players){
   if(p.team===-2)continue; // Already retired; never age or retire a second time.
   p.age++;p.years--;p.fatigue=0;p.morale=clamp(p.morale+5,20,100);
-  if(p.age>34&&Math.random()<clamp((p.age-33)*.09,0,.75)){const retired={...p,retiredYear:state.year};state.retired.push(retired);window.GMSimPresentation?.retirement(state,retired);p.team=-2}
+  if(p.age>34&&Math.random()<clamp((p.age-33)*.09*(p.morale<40?1.18:1),0,.75)){const retired={...p,retiredYear:state.year};state.retired.push(retired);window.GMSimPresentation?.retirement(state,retired);p.team=-2}
   else if(p.years<=0){
     if(p.team>=0){p.lastContractTeam=p.team;p.freeAgentSince=state.year}
     else p.freeAgentSince??=state.year;
@@ -254,11 +245,26 @@ function endSeasonV2(){
  save();render();
  if(champ===state.team&&typeof window.launchChampionshipCelebration==='function')window.launchChampionshipCelebration(TEAMS[champ][1],state.year-1);
 }
+// Advance through the same public weekly hooks. Intermediate screens are never
+// shown during this synchronous operation, so serialize and draw only once.
+window.simulateRegularSeason=function(){
+ if(state.week>18)return;
+ const persist=save,draw=render,checkpoint=JSON.stringify(state);
+ try{
+   save=()=>{};render=()=>{};
+   while(state.week<=18){
+     const week=state.week;simulate();
+     if(state.week===week)break; // roster validation or a cancelled week
+   }
+ }catch(error){state=JSON.parse(checkpoint);selectedWeek=state.week;throw error;}
+ finally{save=persist;render=draw;persist();draw();}
+};
 function scheduleV2(){
  setup();
  const games=state.engine.schedule.filter(g=>g.week===selectedWeek);
  return title('Season Schedule',state.year+' · Week '+state.week+' of 18 · All matchups locked in before kickoff','LEAGUE SCHEDULE')
  +'<button class="primary" onclick="simulate()">Simulate Week '+state.week+'</button>'
+ +(state.week<=18?'<button onclick="simulateRegularSeason()">Simulate to playoffs</button>':'')
  +'<div class="filters">'+Array.from({length:18},(_,i)=>'<button class="'+(selectedWeek===i+1?'selected':'')+'" onclick="selectedWeek='+(i+1)+';render()">W'+(i+1)+'</button>').join('')+'</div>'
  +'<div class="grid two">'+games.map(g=>{const result=state.results.find(x=>x.year===state.year&&x.week===selectedWeek&&x.a===g.a&&x.b===g.b);return '<div class="card"><div class="eyebrow">'+(result?'FINAL':'UPCOMING')+'</div><div class="row"><b>'+TEAMS[g.a][1]+'</b><b>'+(result?result.sa:'—')+'</b></div><div class="row"><b>'+TEAMS[g.b][1]+'</b><b>'+(result?result.sb:'—')+'</b></div></div>'}).join('')+'</div>';
 }

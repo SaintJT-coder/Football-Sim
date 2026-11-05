@@ -15,7 +15,7 @@ const state=(team,year)=>({year,week:4,team,
 const fresh=()=>state(0,2026);
 const storage=new Map();
 const get=()=>vm.runInNewContext(startup+';state',{
- TEAMS:teams,localStorage:{getItem:key=>storage.get(key)??null},fresh
+ window:{},TEAMS:teams,localStorage:{getItem:key=>storage.get(key)??null},fresh
 });
 storage.set('gridiron-gm-save',JSON.stringify(state(2,2027)));
 storage.set('gridiron-gm-current-slot-v3','named-branch');

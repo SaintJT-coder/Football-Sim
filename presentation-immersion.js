@@ -374,6 +374,11 @@ function gameCenterPage(s){
          '<div class="gm-p7-review-card"><small>'+escape(p.pos||'PLAYER')+'</small>'+
          '<h3>'+escape(p.name)+'</h3><p>Overall '+Number(p.rating||0)+
          ' • '+escape(name(p.team))+'</p></div>').join('')+'</div>':'')+
+   (selected&&s.engine?.lastPlayLog&&[selected.year,selected.week,selected.a,selected.b].join(':')===
+      [s.engine.lastPlayLog.year,s.engine.lastPlayLog.week,s.engine.lastPlayLog.a,s.engine.lastPlayLog.b].join(':')?
+      '<details><summary>Play-by-play</summary>'+s.engine.lastPlayLog.plays.map(p=>
+       '<p>Q'+Number(p.period)+' '+Math.floor(p.clock/60)+':'+String(p.clock%60).padStart(2,'0')+' · '+
+       escape(name(p.team))+' · '+Number(p.down)+' &amp; '+Number(p.need)+' at '+Number(p.spot)+' · '+escape(p.description)+'</p>').join('')+'</details>':'')+
    (selected.report?.drives?.length?'<h2 class="gm-p7-heading">POSSESSIONS</h2><div class="gm-p7-archive">'+
      selected.report.drives.map(d=>'<p>Q'+Number(d.period)+' · '+escape(name(d.team))+' from the '+Number(d.start)+
        ' · '+Number(d.plays)+' plays · '+escape(d.outcome)+'</p>').join('')+'</div>':'')+

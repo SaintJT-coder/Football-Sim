@@ -308,6 +308,8 @@ function release(p,s){
  const voidBalance=(c.voidProration||[]).filter(x=>!x.accelerated).reduce((n,x)=>n+x.amount,0);
  const futureGuaranteedSalary=(c.guarantees||[]).slice(offset+1).reduce((sum,v)=>sum+(v||0),0);
  const amount=money(currentAndFuture+voidBalance+futureGuaranteedSalary);
+ if(amount>0&&amount>sheet(s,p.team,s.year).space+hit(p,s,s.year)+.000001)
+   return {ok:false,error:'Accelerated dead cap would exceed the salary cap'};
  if(amount){
    const l=root.GMContractsAdvanced.ledger(s);l.deadCap[s.year]??=[];
    l.deadCap[s.year].push({team:p.team,playerId:p.id,name:p.name,amount,reason:'RELEASE'});

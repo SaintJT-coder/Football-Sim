@@ -4,7 +4,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const modules=[
- 'gridiron-core.js','franchise-systems.js','player-development.js',
+ 'franchise-rules.js','gridiron-core.js','franchise-systems.js','player-development.js',
  'coaching-philosophy.js','coaching-staff.js','player-personality.js',
  'roster-rules.js','weekly-gameplan.js','owner-franchise.js',
  'injury-medical.js','season-recap.js','draft-scouting-advanced.js',
@@ -62,11 +62,11 @@ for(let season=0;season<seasons;season++){
  const year=2026+season;
  assert.equal(state.year,year,'Year at season opening');
  assert.equal(state.week,1,'Week at season opening');
- const beforeDraft=state.players.length;
+ const beforeDraft=state.players.length+(state.frontOffice?.unsigned?.length||0);
  scope.autoDraft();
  const draftPicks=state.frontOffice.draftLog.length;
  assert.equal(draftPicks,224,'Seven-round draft not completed for '+year);
- assert.equal(state.players.length,beforeDraft+224,'Rookie player count for '+year);
+ assert.equal(state.players.length+(state.frontOffice?.unsigned?.length||0),beforeDraft+224,'Rookie player count for '+year);
  const activeBeforeCuts=scope.GMRosterRules.count(state,state.team).ACTIVE;
  if(activeBeforeCuts>53){
    const cuts=scope.GMRosterRules.autoPracticeCuts(state,state.team);
@@ -85,7 +85,7 @@ for(let season=0;season<seasons;season++){
  }
  assert.equal(state.week,19,'Regular season did not end');
  const games=state.results.filter(g=>g.year===year);
- assert.equal(games.length,272,'Expected 272 results in '+year);
+ assert.equal(games.length,288,'Expected 288 results in '+year);
  assert.equal(new Set(games.flatMap(g=>[g.a,g.b])).size,32);
  const preSeasonSize=Buffer.byteLength(JSON.stringify(state),'utf8');
  scope.simulate();
@@ -130,4 +130,4 @@ for(let season=0;season<seasons;season++){
 }
 assert.equal(state.seasonRecaps.length,seasons);
 assert.equal(state.leagueNarratives.honors.length,seasons);
-console.log('PASS five full seasons: draft, 17-game schedule, playoffs, cap, records and save growth');
+console.log('PASS five full seasons: draft, 18-game schedule, playoffs, cap, records and save growth');

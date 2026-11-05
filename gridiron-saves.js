@@ -2,6 +2,7 @@
 (function(w){'use strict';
 const KEY='gridiron-gm-save',INDEX='gridiron-gm-save-index-v3',PREFIX='gridiron-gm-slot-v3:',CURRENT='gridiron-gm-current-slot-v3',LEGACY='gridiron-gm-slots-v2',LEGACY_DONE='gridiron-gm-v2-imported-v3';
 const read=k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}};
+const upgrade=value=>w.GMFranchiseRules?w.GMFranchiseRules.load(value,()=>fresh()):value;
 const clone=v=>JSON.parse(JSON.stringify(v));
 // The named slot is canonical. A compatibility mirror is best-effort because
 // a second full JSON copy can exceed Safari/Chromium localStorage quota.
@@ -35,13 +36,13 @@ function restore(){
  // Only release the compatibility copy AFTER verifying the canonical data.
  // This ensures old browser saves remain recoverable if the slot is corrupt.
  try{localStorage.removeItem(KEY)}catch{}
- return clone(data);
+ return upgrade(data);
 }
 const meta=(s,name,branchOf)=>({name:String(name||'Franchise').slice(0,80),year:s.year,week:s.week,team:s.team,lastPlayed:new Date().toISOString(),branchOf:branchOf||null});
 function write(s,name,slotId,branchOf){if(!valid(s))throw Error('Invalid franchise state');const key=slotId||id(),entries=index(),previous=entries.find(x=>x.id===key);const info={id:key,...meta(s,name||previous?.name,branchOf===undefined?previous?.branchOf:branchOf)};localStorage.setItem(PREFIX+key,JSON.stringify(s));const updated=[info,...entries.filter(x=>x.id!==key)];localStorage.setItem(INDEX,JSON.stringify(updated));return info}
-function snapshot(s){const key=activeId();if(!key)return;const info=index().find(x=>x.id===key);if(!info)return;write(s,info.name,key)}
+function snapshot(s){if(w.GMFranchiseRules?.recovered.has(s)){const info=create(s,'Recovered Franchise');w.GMFranchiseRules.recovered.delete(s);return info;}const key=activeId();if(!key)return;const info=index().find(x=>x.id===key);if(!info)return;write(s,info.name,key)}
 function create(s,name){const info=write(s,name);localStorage.setItem(CURRENT,info.id);return info}
-function activate(slotId){const entry=index().find(x=>x.id===slotId),data=read(PREFIX+slotId);if(!entry||!valid(data))throw Error('Save slot is missing or invalid');localStorage.setItem(CURRENT,slotId);writeMirror(data);return clone(data)}
+function activate(slotId){const entry=index().find(x=>x.id===slotId),data=read(PREFIX+slotId);if(!entry||!valid(data))throw Error('Save slot is missing or invalid');localStorage.setItem(CURRENT,slotId);writeMirror(data);return upgrade(clone(data))}
 function branch(s,name){
  // Store the exact fork point in the parent before changing the active timeline.
  // A second save of the branch must never alter this parent snapshot.
@@ -70,7 +71,7 @@ function remove(slotId){
 }
 function rename(slotId,name){const entry=index().find(x=>x.id===slotId);if(!entry)throw Error('Save not found');return write(read(PREFIX+slotId),String(name||entry.name).trim(),slotId)}
 function exportSave(slotId){const data=read(PREFIX+slotId),entry=index().find(x=>x.id===slotId);if(!valid(data)||!entry)throw Error('Save not found');const json=JSON.stringify({format:'gridiron-gm',version:3,metadata:entry,state:data},null,2);const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='gridiron-'+entry.name.replace(/[^a-z0-9-]/gi,'-').slice(0,35)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
-async function importSave(file){if(!file||file.size>20*1024*1024)throw Error('JSON file must be under 20 MB');const payload=JSON.parse(await file.text());if(payload.format!=='gridiron-gm'||!valid(payload.state)||payload.state.players.length>10000||payload.state.week<1||payload.state.week>30||payload.state.year<1900||payload.state.year>2500)throw Error('Unsupported or invalid Gridiron save');return write(payload.state,payload.metadata?.name||'Imported Franchise')}
+async function importSave(file){if(!file||file.size>20*1024*1024)throw Error('JSON file must be under 20 MB');const payload=JSON.parse(await file.text());if(payload.format!=='gridiron-gm'||!valid(payload.state)||payload.state.players.length>10000||payload.state.week<1||payload.state.week>30||payload.state.year<1900||payload.state.year>2500)throw Error('Unsupported or invalid Gridiron save');return write(upgrade(payload.state),payload.metadata?.name||'Imported Franchise')}
 function bootstrap(s){
  const current=activeId();
  if(current&&restore())return;

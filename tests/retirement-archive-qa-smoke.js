@@ -4,7 +4,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const modules=[
- 'gridiron-core.js','franchise-systems.js','player-development.js',
+ 'franchise-rules.js','gridiron-core.js','franchise-systems.js','player-development.js',
  'coaching-philosophy.js','coaching-staff.js','player-personality.js',
  'roster-rules.js','weekly-gameplan.js','owner-franchise.js',
  'injury-medical.js','season-recap.js','draft-scouting-advanced.js',
