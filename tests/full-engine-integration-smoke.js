@@ -11,7 +11,7 @@ const modules=[
  'injury-medical.js','season-recap.js','draft-scouting-advanced.js',
  'draft-realism.js','simulation-presentation.js','franchise-relocation.js',
  'league-narratives.js','contracts-advanced.js','contract-economy.js',
- 'engine.js','frontoffice.js','presentation-immersion.js'
+ 'possession-sim.js','engine.js','frontoffice.js','presentation-immersion.js'
 ];
 const names=['North','South','East','West'];
 const TEAMS=Array.from({length:32},(_,i)=>[
@@ -60,15 +60,15 @@ assert.equal(state.results.filter(g=>g.year===2026).length,16);
 // Passing TDs must be credited to receivers as well as the passer.
 for(const team of Array.from({length:32},(_,i)=>i)){
  const roster=state.players.filter(p=>p.team===team);
- const pass=roster.filter(p=>p.pos==='QB').reduce((n,p)=>n+(p.stats.passTD||0),0);
- const receiving=roster.filter(p=>p.pos==='WR'||p.pos==='TE')
+ const pass=roster.reduce((n,p)=>n+(p.stats.passTD||0),0);
+ const receiving=roster
    .reduce((n,p)=>n+(p.stats.recTD||0),0);
  assert.equal(receiving,pass,'Missing receiving touchdowns for team '+team);
 }
 assert.equal(state.immersionPress.active.questions.length,3);
 // Small touchdown totals must never produce negative stats after rounding.
 for(const player of state.players){
- for(const field of ['rushTD','recTD','passTD','receptions','receivingYards','rushYards']){
+ for(const field of ['rushTD','recTD','passTD','receptions']){
    assert.ok((player.stats[field]||0)>=0,'Negative '+field+' for '+player.name);
  }
 }

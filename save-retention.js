@@ -15,6 +15,15 @@ function trimTail(arr,maximum){
 function compact(s){
  if(!s||!Array.isArray(s.players))return {entriesPruned:0,playersExamined:0};
  let removed=0;
+ // The film room keeps recent franchise drives. Scores, records and player totals persist.
+ let detailed=0;
+ for(let i=(s.results||[]).length-1;i>=0;i--){
+   const g=s.results[i];
+   if(g.a!==s.team&&g.b!==s.team&&g.report&&g.week<s.week-1){delete g.report;removed++;}
+   if((g.a===s.team||g.b===s.team)&&++detailed>2&&g.report){
+     delete g.report.drives;delete g.report.specialTeams;
+   }
+ }
  for(const p of s.players){
    if(p.team===s.team)continue; // Never trim the user's training or snap history.
    removed+=trim(p.development?.trainingHistory,CONFIG.aiTrainingHistory);
@@ -38,6 +47,9 @@ function compact(s){
        for(const leader of report.leaders){
          if(Object.hasOwn(leader,'stats')){delete leader.stats;removed++}
        }
+     }
+     if(franchise&&own>2&&report.originalReport){
+       delete report.originalReport.drives;delete report.originalReport.specialTeams;
      }
      if(!franchise||report.year<s.year-1){
        if(Object.hasOwn(report,'originalReport')){delete report.originalReport;removed++}

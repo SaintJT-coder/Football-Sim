@@ -171,6 +171,9 @@ function pressPage(s){
 }
 function status(p){
  if(p.rosterStatus==='IR'||p.rosterStatus==='PUP')return p.rosterStatus;
+ const clearance=root.GMInjuries?.clearance?.(p);
+ if(clearance==='PROBABLE'||clearance==='QUESTIONABLE')return clearance;
+ if(clearance==='OUT')return 'OUT';
  if((p.injury||0)>CONFIG.health.returningWeeks)return 'OUT';
  if((p.injury||0)>CONFIG.health.questionableWeeks)return 'DOUBTFUL';
  if((p.injury||0)>0)return 'QUESTIONABLE';
@@ -180,13 +183,16 @@ function depthData(s,pos){
  return root.GMRosterRules?.depth(s,s.team,pos)||
    s.players.filter(p=>p.team===s.team&&p.pos===pos).sort((a,b)=>b.rating-a.rating);
 }
+function eligibleStarter(p){
+ return root.GMRosterRules?.playable?.(p)??(!(p.injury>0)&&!p.contractAdvanced?.holdout&&
+   !['IR','PUP','PRACTICE'].includes(p.rosterStatus));
+}
 function setStarter(s,pos,id){
  if(!Object.values(CONFIG.depth.positionGroups).flat().includes(pos))
    return {ok:false,error:'Unknown position'};
  const all=s.players.filter(p=>p.team===s.team&&p.pos===pos);
  const selected=all.find(p=>String(p.id)===String(id));
- if(!selected||selected.rosterStatus==='IR'||selected.rosterStatus==='PUP'||
-   selected.rosterStatus==='PRACTICE'||Number(selected.injury||0)>0)
+ if(!selected||!eligibleStarter(selected))
    return {ok:false,error:'Choose a healthy active player'};
  const ordered=[selected.id,...all.filter(p=>p!==selected).sort((a,b)=>b.rating-a.rating).map(p=>p.id)];
  // Keep the rest of the existing depth order instead of re-sorting unrelated players.
@@ -203,8 +209,7 @@ function setStarter(s,pos,id){
 function depthPage(s){
  const groups=CONFIG.depth.positionGroups;
  const roster=s.players.filter(p=>p.team===s.team);
- const healthy=roster.filter(p=>Number(p.injury||0)<=0&&
-   !['IR','PUP','PRACTICE'].includes(p.rosterStatus)&&!p.contractAdvanced?.holdout).length;
+ const healthy=roster.filter(eligibleStarter).length;
  return '<section class="gm-p7"><div class="gm-p7-hero"><div class="gm-p7-eyebrow">FRANCHISE OPERATIONS • PLAYER PERSONNEL</div>'+
    '<h1>DEPTH CHART</h1><p>Who takes the field? Set starters and track backup quality, health and availability.</p></div>'+
    '<div class="gm-p7-metrics"><div><small>ROSTERED</small><strong>'+roster.length+'</strong></div>'+
@@ -214,14 +219,12 @@ function depthPage(s){
      '<h2 class="gm-p7-heading">'+group+' UNIT</h2><div class="gm-p7-position-grid">'+
      positions.map(pos=>{
        const candidates=depthData(s,pos).slice(0,CONFIG.depth.visiblePerPosition);
-       const actualStarter=candidates.find(p=>status(p)==='AVAILABLE'&&
-         p.rosterStatus!=='PRACTICE'&&!p.contractAdvanced?.holdout);
+       const actualStarter=candidates.find(eligibleStarter);
        const starterRating=Number(actualStarter?.rating||0);
        return '<article class="gm-p7-unit"><header><strong>'+escape(pos)+'</strong>'+
          '<span>'+candidates.length+' DEPTH</span></header>'+
          (candidates.map((p,i)=>{
-           const condition=status(p),available=condition==='AVAILABLE'&&
-             p.rosterStatus!=='PRACTICE'&&!p.contractAdvanced?.holdout,
+           const condition=status(p),available=eligibleStarter(p),
              starter=!!actualStarter&&String(actualStarter.id)===String(p.id),
              fit=root.GMFranchise?.fit(p,root.GMFranchise?.scheme(s,s.team,
                ['DL','LB','CB','S'].includes(pos)?'defense':'offense'))??null,
@@ -255,7 +258,7 @@ function injuryPage(s){
    '<p>Player availability, diagnoses, rehabilitation and return-to-play decisions in one view.</p></div>'+
    '<div class="gm-p7-metrics">'+
    [['OUT',counts.OUT+counts.IR+counts.PUP],['DOUBTFUL',counts.DOUBTFUL],
-    ['QUESTIONABLE',counts.QUESTIONABLE]].map(([k,v])=>
+    ['QUESTIONABLE',counts.QUESTIONABLE],['PROBABLE',counts.PROBABLE||0]].map(([k,v])=>
      '<div><small>'+k+'</small><strong>'+v+'</strong></div>').join('')+
    '</div><div class="gm-p7-toolbar">'+
    btn('MY FRANCHISE','gmImmersionInjuryScope(false)',!league?'gm-p7-selected':'')+
@@ -331,9 +334,10 @@ function gameCenterPage(s){
  const statRows=[['TOTAL YARDS','totalYards'],['PASSING YARDS','passYards'],
    ['RUSHING YARDS','rushYards'],['TURNOVERS','turnovers']];
  const quarter=selected?.report?.quarters,quarterLabels=CONFIG.gameCenter.quarterLabels;
- const qTable=quarter?.home?.length===4&&quarter?.away?.length===4?
+ const labels=[...quarterLabels,...Array.from({length:Math.max(0,(quarter?.home?.length||0)-4)},(_,i)=>'OT'+(i+1))];
+ const qTable=quarter?.home?.length>=4&&quarter.home.length===quarter?.away?.length?
    '<div class="gm-p7-scorecard"><div class="gm-p7-quarter-head"><span>QUARTER</span>'+
-   quarterLabels.map(x=>'<b>'+x+'</b>').join('')+'<b>FINAL</b></div>'+
+   labels.map(x=>'<b>'+x+'</b>').join('')+'<b>FINAL</b></div>'+
    [[selected.a,quarter.home,selected.sa],[selected.b,quarter.away,selected.sb]]
      .map(([team,values,total])=>'<div class="gm-p7-quarter-row"><span>'+
        escape(root.TEAMS?.[team]?.[0]||name(team))+'</span>'+
@@ -370,6 +374,11 @@ function gameCenterPage(s){
          '<div class="gm-p7-review-card"><small>'+escape(p.pos||'PLAYER')+'</small>'+
          '<h3>'+escape(p.name)+'</h3><p>Overall '+Number(p.rating||0)+
          ' • '+escape(name(p.team))+'</p></div>').join('')+'</div>':'')+
+   (selected.report?.drives?.length?'<h2 class="gm-p7-heading">POSSESSIONS</h2><div class="gm-p7-archive">'+
+     selected.report.drives.map(d=>'<p>Q'+Number(d.period)+' · '+escape(name(d.team))+' from the '+Number(d.start)+
+       ' · '+Number(d.plays)+' plays · '+escape(d.outcome)+'</p>').join('')+'</div>':'')+
+   (selected.report?.specialTeams?.length?'<details class="gm-p7-archive"><summary>Special teams</summary>'+
+     selected.report.specialTeams.map(k=>'<p>'+escape(k.kind)+' · '+escape(k.outcome)+(k.distance?' from '+Number(k.distance)+' yards':'')+'</p>').join('')+'</details>':'')+
    (selected.report?.keyInjuries?.length?'<h2 class="gm-p7-heading">MEDICAL REPORT</h2>'+
      selected.report.keyInjuries.slice(0,CONFIG.gameCenter.maxInjuryNotes).map(p=>
        '<div class="gm-p7-story"><h3>'+escape(p.name)+'</h3><p>'+

@@ -37,7 +37,8 @@ jobs:
         run: |
           set +e
           exit_code=0
-          for testfile in tests/weekly-gameplan-priority3-smoke.js \
+          for testfile in tests/possession-sim.test.cjs \
+                          tests/weekly-gameplan-priority3-smoke.js \
                           tests/contracts-priority4-smoke.js \
                           tests/draft-priority5-smoke.js \
                           tests/league-narratives-priority6-smoke.js \

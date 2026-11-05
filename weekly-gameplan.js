@@ -82,7 +82,7 @@ function opponent(s){
 }
 function opponentUnit(s,team,positions){
  const candidates=s.players.filter(p=>p.team===team&&positions.includes(p.pos)&&
-   isActive(p)&&Number(p.injury||0)<=0);
+   isActive(p)&&(root.GMInjuries?.clearance?.(p)??(p.injury?'OUT':'FULL'))!=='OUT');
  if(!candidates.length)return CONFIG.matchup.fallbackRating;
  const strongest=candidates.slice().sort((a,b)=>b.rating-a.rating).slice(0,Math.min(CONFIG.matchup.topPlayers,candidates.length));
  return strongest.reduce((a,p)=>a+(p.rating||60),0)/strongest.length;

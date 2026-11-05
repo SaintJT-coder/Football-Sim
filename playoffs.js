@@ -25,6 +25,7 @@ const games=()=>state.results.filter(g=>g.year===state.year&&Number.isFinite(g.s
 function stat(i){let g=games().filter(x=>x.a===i||x.b===i),w=0,l=0,t=0,pf=0,pa=0;for(let x of g){let own=x.a===i?x.sa:x.sb,opp=x.a===i?x.sb:x.sa;pf+=own;pa+=opp;if(own>opp)w++;else if(own<opp)l++;else t++}return {i,w,l,t,pf,pa,pct:(w+t*.5)/Math.max(1,g.length),diff:pf-pa,played:g.length}}
 function compare(a,b){return b.pct-a.pct||b.w-a.w||b.diff-a.diff||b.pf-a.pf||a.i-b.i}
 function seeded(conf){let members=TEAMS.map((t,i)=>stat(i)).filter(x=>TEAMS[x.i][2].startsWith(conf));let divisions=[...new Set(members.map(x=>TEAMS[x.i][2]))],winners=divisions.map(d=>members.filter(x=>TEAMS[x.i][2]===d).sort(compare)[0]).filter(Boolean).sort(compare);let wild=members.filter(x=>!winners.includes(x)).sort(compare);return [...winners,...wild].map((x,j)=>({...x,seed:j+1,divisionWinner:j<winners.length}));}
+window.GMPlayoffSeeds=seeded;
 function badge(x){if(!x)return '<div class="pb-team"><span class="pb-seed">–</span><span class="pb-code">TBD</span></div>';return '<div class="pb-team"><span class="pb-seed">'+x.seed+'</span><span class="pb-code">'+TEAMS[x.i][0]+'</span><span class="pb-record">'+x.w+'-'+x.l+(x.t?'-'+x.t:'')+'</span></div>'}
 function matchup(a,b){return '<div class="pb-game">'+badge(a)+badge(b)+'</div>'}
 function conferenceMarkup(conf){

@@ -65,7 +65,7 @@ function autoPracticeCuts(s,team,dryRun=false){
    counts:dryRun?counts:count(s,team)};
 }
 
-function playable(p){return (status(p)==='ACTIVE'||(status(p)==='PRACTICE'&&p.weeklyElevation?.active))&&Number(p.injury||0)<=0&&!p.contractAdvanced?.holdout}
+function playable(p){return (status(p)==='ACTIVE'||(status(p)==='PRACTICE'&&p.weeklyElevation?.active))&&(root.GMInjuries?.clearance(p)??(p.injury>0?'OUT':'FULL'))!=='OUT'&&!p.contractAdvanced?.holdout}
 function lock(p,locked=true){if(!p)return false;p.depthLocked=!!locked;return true}
 function depth(s,team,pos){const ps=[...members(s,team,'ACTIVE'),...members(s,team,'PRACTICE').filter(p=>p.weeklyElevation?.active)].filter(p=>p.pos===pos),saved=s.franchiseSystems?.depthCharts?.[team]?.[pos]||[],order=new Map(saved.map((id,i)=>[String(id),i]));
  const value=p=>p.rating-(p.fatigue||0)*.13+(p.form||0)*.9-(p.injury||0)*25;

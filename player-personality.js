@@ -95,7 +95,19 @@ function ratingModifier(p){return style(p)?.[2]||0}
 function performanceModifier(p,phase){const x=style(p);return x&&(!phase||phase===x[1])?x[3]:0}
 function eligible(p){return p.team>=0&&!(Number(p.injury)>0)&&!p.contractAdvanced?.holdout&&
   (!root.GMRosterRules||root.GMRosterRules.playable(p))}
-function recordGame(s,g,team,passShare=.53){
+function recordGame(s,g,team,passShare=.53,actual=null){
+ if(actual){
+   const key=[s.year,s.week,g.a,g.b].join(':');
+   for(const p of s.players){
+     const n=actual.get(p.id)?.snaps;
+     if(p.team!==team||!n)continue;
+     const sn=ensure(p).snaps;if(sn.last?.key===key)continue;
+     if(sn.year!==s.year){sn.year=s.year;sn.season=0}
+     sn.season+=n;sn.total+=n;sn.last={key,year:s.year,week:s.week,count:n,team};
+     sn.history.unshift({year:s.year,week:s.week,count:n});sn.history.length=Math.min(12,sn.history.length);
+   }
+   return;
+ }
  const plays=clamp(CONFIG.usage.basePlays+Math.round((Math.random()-.5)*2*CONFIG.usage.variation),45,85);
  const key=s.year+':'+s.week+':'+g.a+':'+g.b;
  const roster=s.players.filter(p=>p.team===team&&eligible(p));

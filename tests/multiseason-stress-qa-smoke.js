@@ -11,7 +11,7 @@ const modules=[
  'draft-realism.js','simulation-presentation.js','franchise-relocation.js',
  'league-narratives.js','contracts-advanced.js','contract-economy.js',
  'save-retention.js','league-player-lifecycle.js',
- 'engine.js','frontoffice.js','presentation-immersion.js'
+ 'possession-sim.js','engine.js','frontoffice.js','presentation-immersion.js'
 ];
 const names=['North','South','East','West'];
 const TEAMS=Array.from({length:32},(_,i)=>[
